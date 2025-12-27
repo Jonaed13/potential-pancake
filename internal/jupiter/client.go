@@ -243,18 +243,15 @@ func (c *Client) GetQuote(ctx context.Context, inputMint, outputMint string, amo
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("quote failed (%d): %s", resp.StatusCode, string(body))
 	}
 
 	var quote QuoteResponse
-	if err := json.Unmarshal(body, &quote); err != nil {
-		return nil, fmt.Errorf("unmarshal quote: %w", err)
+	// Optimized: Use Decoder to stream response
+	if err := json.NewDecoder(resp.Body).Decode(&quote); err != nil {
+		return nil, fmt.Errorf("decode quote: %w", err)
 	}
 
 	log.Debug().
@@ -355,18 +352,15 @@ func (c *Client) GetSwapTransaction(ctx context.Context, inputMint, outputMint, 
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("swap failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var swapResp SwapResponse
-	if err := json.Unmarshal(respBody, &swapResp); err != nil {
-		return "", fmt.Errorf("unmarshal swap response: %w", err)
+	// Optimized: Use Decoder to stream response
+	if err := json.NewDecoder(resp.Body).Decode(&swapResp); err != nil {
+		return "", fmt.Errorf("decode swap response: %w", err)
 	}
 
 	totalLatency := time.Since(start)
