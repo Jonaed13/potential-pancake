@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -54,7 +55,17 @@ type Signal struct {
 
 // NewDB creates a new database connection
 func NewDB(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path)
+	// Add connection options to path if not present
+	// _pragma=journal_mode(WAL) & _pragma=synchronous(NORMAL)
+	dsn := path
+	if !strings.Contains(path, "?") {
+		dsn += "?"
+	} else {
+		dsn += "&"
+	}
+	dsn += "_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)"
+
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
