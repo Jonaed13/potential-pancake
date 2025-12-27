@@ -23,6 +23,7 @@ type Executor struct {
 	positions      *PositionTracker
 	balance        *blockchain.BalanceTracker
 	db             *storage.DB
+	mu             sync.Mutex
 
 	// Callbacks
 	onTradeExecuted func(signal *signalPkg.Signal, txSig string, success bool)
@@ -58,6 +59,9 @@ func (e *Executor) SetOnTradeExecuted(fn func(signal *signalPkg.Signal, txSig st
 
 // ProcessSignal processes a trading signal
 func (e *Executor) ProcessSignal(ctx context.Context, signal *signalPkg.Signal) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	// Log signal to DB
 	if e.db != nil {
 		if err := e.db.InsertSignal(&storage.Signal{
