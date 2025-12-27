@@ -1,8 +1,13 @@
 package token
 
 import (
+	"errors"
+
 	"github.com/rs/zerolog/log"
 )
+
+// ErrTokenNotFound is returned when a token cannot be resolved
+var ErrTokenNotFound = errors.New("token not found in cache")
 
 // FIX: O(1) Base58 lookup table instead of O(n*58) nested loops
 var base58Set = func() [256]bool {
@@ -31,12 +36,12 @@ func NewResolver(cache *Cache) *Resolver {
 // 1. CA already provided (passthrough)
 // 2. Cache lookup
 // 3. (Future) RPC lookup
-func (r *Resolver) Resolve(tokenNameOrCA string) string {
+func (r *Resolver) Resolve(tokenNameOrCA string) (string, error) {
 	// Check if it's already a CA (Base58, 43-44 chars)
 	if len(tokenNameOrCA) >= 43 && len(tokenNameOrCA) <= 44 {
 		if isValidBase58(tokenNameOrCA) {
 			log.Debug().Str("ca", tokenNameOrCA).Msg("token already a CA")
-			return tokenNameOrCA
+			return tokenNameOrCA, nil
 		}
 	}
 
@@ -46,13 +51,13 @@ func (r *Resolver) Resolve(tokenNameOrCA string) string {
 			Str("token", tokenNameOrCA).
 			Str("mint", mint).
 			Msg("token resolved from cache")
-		return mint
+		return mint, nil
 	}
 
-	log.Warn().
+	log.Debug().
 		Str("token", tokenNameOrCA).
 		Msg("token not found in cache")
-	return ""
+	return "", ErrTokenNotFound
 }
 
 // AddToken adds a new token to the cache and saves
