@@ -420,6 +420,8 @@ func (e *ExecutorFast) executeBuyFast(ctx context.Context, signal *signalPkg.Sig
 		}
 
 		// Simulation Mode Bypass
+		// This is the primary simulation mode bypass. It prevents the bot from
+		// making any real trades or sending any transactions.
 		if e.simMode || e.cfg.Get().Trading.SimulationMode {
 			log.Warn().Msg("SIMULATION MODE: Skipping real transaction steps")
 			timer.MarkQuoteDone()
