@@ -455,9 +455,9 @@ func (m *Model) adjustConfig(delta float64) {
 		switch idx {
 		case 0: c.Trading.MinEntryPercent = maxf(10, c.Trading.MinEntryPercent + delta*5)
 		case 1: c.Trading.TakeProfitMultiple = maxf(1.5, c.Trading.TakeProfitMultiple + delta*0.5)
-		case 2: c.Trading.MaxAllocPercent = maxf(5, c.Trading.MaxAllocPercent + delta*5)
-		case 3: c.Trading.MaxOpenPositions = maxi(1, c.Trading.MaxOpenPositions + int(delta))
-		case 4: c.Fees.StaticPriorityFeeSol = maxf(0.0001, c.Fees.StaticPriorityFeeSol + delta*0.001)
+		case 2: c.Trading.MaxAllocPercent = minf(100, maxf(5, c.Trading.MaxAllocPercent + delta*5))
+		case 3: c.Trading.MaxOpenPositions = mini(50, maxi(1, c.Trading.MaxOpenPositions + int(delta)))
+		case 4: c.Fees.StaticPriorityFeeSol = minf(1.0, maxf(0.0001, c.Fees.StaticPriorityFeeSol + delta*0.001))
 		case 5: c.Trading.AutoTradingEnabled = !c.Trading.AutoTradingEnabled; m.Running = c.Trading.AutoTradingEnabled
 		}
 	})
@@ -1287,13 +1287,19 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 func (cm ConfigModal) Render(w, h int) string {
 	t := cm.Cfg.GetTrading()
 	f := cm.Cfg.Get() // Get full config for Fees
+
+	autoTrade := StyleLoss.Render("OFF")
+	if t.AutoTradingEnabled {
+		autoTrade = StyleProfit.Render("ON")
+	}
+
 	rows := []string{
 		fmt.Sprintf("Min Entry %%:  %.0f", t.MinEntryPercent),
 		fmt.Sprintf("Take Profit:  %.1fx", t.TakeProfitMultiple),
 		fmt.Sprintf("Max Alloc %%:  %.0f", t.MaxAllocPercent),
 		fmt.Sprintf("Max Pos:      %d", t.MaxOpenPositions),
 		fmt.Sprintf("Priority Fee: %.4f", f.Fees.StaticPriorityFeeSol),
-		fmt.Sprintf("Auto Trade:   %v", t.AutoTradingEnabled),
+		fmt.Sprintf("Auto Trade:   %s", autoTrade),
 	}
 	
 	s := "CONFIGURATION\n\n"
@@ -1302,7 +1308,7 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
-	s += "\n[Ent] Save  [Esc] Cancel"
+	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
 
@@ -1346,7 +1352,9 @@ func (thv TradesHistoryView) Render(w, h int) string {
 
 // --- HELPERS ---
 func maxf(a,b float64) float64 { if a>b{return a}; return b }
+func minf(a,b float64) float64 { if a<b{return a}; return b }
 func maxi(a,b int) int { if a>b{return a}; return b }
+func mini(a,b int) int { if a<b{return a}; return b }
 func truncate(s string, n int) string { return runewidth.Truncate(s, n, "") }
 func formatDuration(d time.Duration) string {
 	if d < 60*time.Second { return fmt.Sprintf("%ds", int(d.Seconds())) }
