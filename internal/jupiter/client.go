@@ -264,36 +264,6 @@ func (c *Client) GetQuote(ctx context.Context, inputMint, outputMint string, amo
 
 // GetSwapTransaction fetches swap TX using Jupiter Metis API with veryHigh priority
 func (c *Client) GetSwapTransaction(ctx context.Context, inputMint, outputMint, userPubkey string, amountLamports uint64) (string, error) {
-	c.simMu.RLock()
-	isSim := c.simMode
-	c.simMu.RUnlock()
-	if isSim {
-		// Return a dummy base64 transaction (Solana transactions are base64 encoded)
-		// This is just random bytes encoded, not a valid TX, but Mock sending should handle it.
-		// If Executor tries to sign it, it might fail deserialization?
-		// ExecutorFast: e.txBuilder.SignSerializedTransaction(swapTx)
-		// SignSerializedTransaction expects valid base64.
-		// If it deserializes inside, we need a VALID transaction structure.
-		// But creating a valid empty legacy transaction in base64 is tedious.
-		// Let's check logic:
-		// ExecutorFast: signedTx, err := e.txBuilder.SignSerializedTransaction(swapTx)
-		// If Sign fails, it logs error.
-		// If SimulationMode logic in ExecutorFast WAS working, we wouldn't need this.
-		// But assuming we are here, we need a string that PASSES SignSerializedTransaction.
-		// ... OR we modify SignSerializedTransaction to mock too? No.
-		
-		// Wait, ExecutorFast bypass logic IS checking `cfg.SimulationMode`.
-		// If I cannot fix `cfg`, then ExecutorFast bypass is dead.
-		// I MUST provide a string that creates a valid `solana.Transaction`.
-		// "AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" (Empty msg?)
-		
-		// Actually, I should probably return an error "SIMULATION_BYPASS"?
-		// No, expected success.
-		
-		// Use a minimal valid transaction base64?
-		// "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAA=="
-		return "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAA==", nil
-	}
 	start := time.Now()
 
 	// Get quote first

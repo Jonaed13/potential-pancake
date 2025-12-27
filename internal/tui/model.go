@@ -369,17 +369,21 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, keys.Left):
 			if m.UIMode == 4 {
-				// Optional: Left key could move focus left?
-				// For now kept as Signal scroll for legacy manual override or if user prefers h/l
-				// Let's make it shift focus for better UX?
-				// No, user specifically asked for scroll fix.
-				// Let's make Left/Right ALSO scroll the focused pane for convenience (h/l style)
+				if m.FocusPane == 1 && m.Signals.Offset > 0 {
+					m.Signals.Offset--
+				} else if m.FocusPane == 2 && m.Positions.Offset > 0 {
+					m.Positions.Offset--
+				}
 			} else {
 				if m.Signals.Offset > 0 { m.Signals.Offset-- }
 			}
 		case key.Matches(msg, keys.Right):
 			if m.UIMode == 4 {
-				// ...
+				if m.FocusPane == 1 && m.Signals.Offset < len(m.Signals.List)-1 {
+					m.Signals.Offset++
+				} else if m.FocusPane == 2 && m.Positions.Offset < len(m.Positions.Positions)-1 {
+					m.Positions.Offset++
+				}
 			} else {
 				if m.Signals.Offset < len(m.Signals.List)-1 { m.Signals.Offset++ }
 			}
