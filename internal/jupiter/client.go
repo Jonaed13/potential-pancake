@@ -264,6 +264,21 @@ func (c *Client) GetQuote(ctx context.Context, inputMint, outputMint string, amo
 
 // GetSwapTransaction fetches swap TX using Jupiter Metis API with veryHigh priority
 func (c *Client) GetSwapTransaction(ctx context.Context, inputMint, outputMint, userPubkey string, amountLamports uint64) (string, error) {
+	// Simulation Interceptor
+	c.simMu.RLock()
+	isSim := c.simMode
+	c.simMu.RUnlock()
+
+	if isSim {
+		// Return a valid dummy transaction string that satisfies downstream parsers (SignSerializedTransaction).
+		// String breakdown:
+		// - Byte 0: 0x01 (Signature Count = 1)
+		// - Bytes 1-64: 0x00... (Empty Signature Slot)
+		// - Bytes 65-66: 0x00 0x01 (Minimal Dummy Message)
+		// This ensures SignSerializedTransaction can identify the signature slot and message without crashing.
+		return "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAA==", nil
+	}
+
 	start := time.Now()
 
 	// Get quote first
