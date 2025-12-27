@@ -843,119 +843,136 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 
 	cfg := e.cfg.GetTrading()
 
+	// ⚡ Bolt Optimization: Parallelize position monitoring
+	// Use a semaphore to limit concurrency and avoid API rate limits
+	const maxConcurrentChecks = 5
+	sem := make(chan struct{}, maxConcurrentChecks)
+	var wg sync.WaitGroup
+
 	for _, pos := range positions {
-		// FIX: Handle stale PENDING positions (failed buys)
-		if pos.EntryTxSig == "PENDING" {
-			// If pending for more than PendingPositionTTL, mark as failed
-			if time.Since(pos.EntryTime) > PendingPositionTTL {
-				log.Warn().
-					Str("token", pos.TokenName).
-					Dur("age", time.Since(pos.EntryTime)).
-					Msg("removing stale PENDING position (buy likely failed)")
-				e.positions.Remove(pos.Mint)
-				continue
-			}
-		}
+		wg.Add(1)
+		go func(pos *Position) {
+			defer wg.Done()
 
-		// Get current token balance
-		balance, err := e.getTokenBalance(ctx, pos.Mint)
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		// FIX: Handle 0 balance - mark position as lost/failed
-		if err != nil {
-			log.Debug().Err(err).Str("mint", pos.Mint[:8]+"...").Msg("failed to get balance")
-			continue
-		}
-
-		if balance == 0 {
-			// Position has 0 tokens - either sold externally or buy failed
-			if pos.EntryTxSig != "PENDING" && pos.EntryTxSig != "FAILED" {
-				// Was a real position that now has 0 tokens
-				log.Warn().
-					Str("token", pos.TokenName).
-					Msg("position has 0 tokens - marking as sold/failed")
-				pos.CurrentValue = 0
-				pos.PnLPercent = -100 // Show as total loss
-				pos.EntryTxSig = "FAILED"
-				// Keep it visible for FailedPositionTTL then remove
-				if time.Since(pos.EntryTime) > FailedPositionTTL {
+			// FIX: Handle stale PENDING positions (failed buys)
+			if pos.EntryTxSig == "PENDING" {
+				// If pending for more than PendingPositionTTL, mark as failed
+				if time.Since(pos.EntryTime) > PendingPositionTTL {
+					log.Warn().
+						Str("token", pos.TokenName).
+						Dur("age", time.Since(pos.EntryTime)).
+						Msg("removing stale PENDING position (buy likely failed)")
 					e.positions.Remove(pos.Mint)
+					return
 				}
 			}
-			continue
-		}
 
-		// Get Quote for ALL tokens -> SOL
-		quote, err := e.jupiter.GetQuote(ctx, pos.Mint, jupiter.SOLMint, balance)
-		if err != nil {
-			continue
-		}
+			// Get current token balance
+			balance, err := e.getTokenBalance(ctx, pos.Mint)
 
-		outAmount, _ := strconv.ParseUint(quote.OutAmount, 10, 64)
-		currentValSOL := float64(outAmount) / 1e9
-
-		// Update Position Stats
-		pos.CurrentValue = currentValSOL
-		pos.PnLSol = currentValSOL - pos.Size
-		if pos.Size > 0 {
-			pos.PnLPercent = ((currentValSOL / pos.Size) - 1.0) * 100
-		}
-
-		// Logic: 2X Detection
-		multiple := 0.0
-		if pos.Size > 0 {
-			multiple = currentValSOL / pos.Size
-		}
-
-		if multiple >= cfg.TakeProfitMultiple { // Use config multiple (e.g. 2.0)
-			if !pos.Reached2X {
-				pos.Reached2X = true
-				log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("reached target! marked as win")
-				e.Increment2XHit()
+			// FIX: Handle 0 balance - mark position as lost/failed
+			if err != nil {
+				log.Debug().Err(err).Str("mint", pos.Mint[:8]+"...").Msg("failed to get balance")
+				return
 			}
 
-			// Trigger Auto-Sell
-			if cfg.AutoTradingEnabled {
-				log.Info().Str("token", pos.TokenName).Msg("triggering take-profit sell")
+			if balance == 0 {
+				// Position has 0 tokens - either sold externally or buy failed
+				if pos.EntryTxSig != "PENDING" && pos.EntryTxSig != "FAILED" {
+					// Was a real position that now has 0 tokens
+					log.Warn().
+						Str("token", pos.TokenName).
+						Msg("position has 0 tokens - marking as sold/failed")
+					pos.CurrentValue = 0
+					pos.PnLPercent = -100 // Show as total loss
+					pos.EntryTxSig = "FAILED"
+					// Keep it visible for FailedPositionTTL then remove
+					if time.Since(pos.EntryTime) > FailedPositionTTL {
+						e.positions.Remove(pos.Mint)
+					}
+				}
+				return
+			}
 
-				// Create timer
-				timer := NewTradeTimer()
+			// Get Quote for ALL tokens -> SOL
+			quote, err := e.jupiter.GetQuote(ctx, pos.Mint, jupiter.SOLMint, balance)
+			if err != nil {
+				return
+			}
 
-				// Create Exit Signal
-				exitSig := &signalPkg.Signal{
-					Mint:      pos.Mint,
-					TokenName: pos.TokenName,
-					Type:      signalPkg.SignalExit,
-					Value:     multiple,
+			outAmount, _ := strconv.ParseUint(quote.OutAmount, 10, 64)
+			currentValSOL := float64(outAmount) / 1e9
+
+			// Update Position Stats
+			pos.CurrentValue = currentValSOL
+			pos.PnLSol = currentValSOL - pos.Size
+			if pos.Size > 0 {
+				pos.PnLPercent = ((currentValSOL / pos.Size) - 1.0) * 100
+			}
+
+			// Logic: 2X Detection
+			multiple := 0.0
+			if pos.Size > 0 {
+				multiple = currentValSOL / pos.Size
+			}
+
+			if multiple >= cfg.TakeProfitMultiple { // Use config multiple (e.g. 2.0)
+				if !pos.Reached2X {
+					pos.Reached2X = true
+					log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("reached target! marked as win")
+					e.Increment2XHit()
 				}
 
-				// Execute Sell
-				go e.executeSellFast(ctx, exitSig, timer)
-			}
-		}
+				// Trigger Auto-Sell
+				if cfg.AutoTradingEnabled {
+					log.Info().Str("token", pos.TokenName).Msg("triggering take-profit sell")
 
-		// Logic: Partial Profit-Taking
-		if cfg.PartialProfitPercent > 0 && cfg.PartialProfitMultiple > 1.0 {
-			if multiple >= cfg.PartialProfitMultiple && !pos.PartialSold {
-				log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("triggering partial profit take")
-				e.executePartialSell(ctx, pos, cfg.PartialProfitPercent)
-			}
-		}
+					// Create timer
+					timer := NewTradeTimer()
 
-		// Logic: Time-Based Exit
-		if cfg.MaxHoldMinutes > 0 {
-			if time.Since(pos.EntryTime) > time.Duration(cfg.MaxHoldMinutes)*time.Minute {
-				log.Info().Str("token", pos.TokenName).Msg("max hold time reached, selling all")
-				// Create a fake signal to trigger full sell
-				sig := &signalPkg.Signal{
-					Mint:      pos.Mint,
-					TokenName: pos.TokenName,
-					Type:      signalPkg.SignalExit,
-					Value:     currentValSOL,
+					// Create Exit Signal
+					exitSig := &signalPkg.Signal{
+						Mint:      pos.Mint,
+						TokenName: pos.TokenName,
+						Type:      signalPkg.SignalExit,
+						Value:     multiple,
+					}
+
+					// Execute Sell
+					go e.executeSellFast(ctx, exitSig, timer)
 				}
-				e.executeSellFast(ctx, sig, NewTradeTimer())
 			}
-		}
+
+			// Logic: Partial Profit-Taking
+			if cfg.PartialProfitPercent > 0 && cfg.PartialProfitMultiple > 1.0 {
+				if multiple >= cfg.PartialProfitMultiple && !pos.PartialSold {
+					log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("triggering partial profit take")
+					e.executePartialSell(ctx, pos, cfg.PartialProfitPercent)
+				}
+			}
+
+			// Logic: Time-Based Exit
+			if cfg.MaxHoldMinutes > 0 {
+				if time.Since(pos.EntryTime) > time.Duration(cfg.MaxHoldMinutes)*time.Minute {
+					log.Info().Str("token", pos.TokenName).Msg("max hold time reached, selling all")
+					// Create a fake signal to trigger full sell
+					sig := &signalPkg.Signal{
+						Mint:      pos.Mint,
+						TokenName: pos.TokenName,
+						Type:      signalPkg.SignalExit,
+						Value:     currentValSOL,
+					}
+					e.executeSellFast(ctx, sig, NewTradeTimer())
+				}
+			}
+		}(pos)
 	}
+
+	wg.Wait()
 }
 
 func (e *ExecutorFast) executePartialSell(ctx context.Context, pos *Position, percent float64) {
