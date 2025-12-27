@@ -28,8 +28,8 @@ if [ ! -f .env ]; then
     echo -e "${RED}Creating .env file...${NC}"
     cat > .env << 'EOF'
 # Telegram Credentials
-TG_API_ID=32075863
-TG_API_HASH=45e0e97af3144bd63476134dba4b660a
+TG_API_ID=
+TG_API_HASH=
 TG_PHONE=
 TG_CHANNEL_LINK=
 
