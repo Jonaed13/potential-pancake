@@ -55,7 +55,11 @@ func runHeadless() {
 	go func() {
 		for sig := range signalChan {
 			if tokenResolver != nil && sig.Mint == "" {
-				sig.Mint = tokenResolver.Resolve(sig.TokenName)
+				if mint, err := tokenResolver.Resolve(sig.TokenName); err == nil {
+					sig.Mint = mint
+				} else {
+					log.Warn().Err(err).Str("token", sig.TokenName).Msg("failed to resolve mint for signal")
+				}
 			}
 			if executor != nil {
 				executor.ProcessSignalFast(context.Background(), sig)
@@ -177,7 +181,11 @@ func runWithTUI() {
 	go func() {
 		for sig := range signalChan {
 			if tokenResolver != nil && sig.Mint == "" {
-				sig.Mint = tokenResolver.Resolve(sig.TokenName)
+				if mint, err := tokenResolver.Resolve(sig.TokenName); err == nil {
+					sig.Mint = mint
+				} else {
+					log.Warn().Err(err).Str("token", sig.TokenName).Msg("failed to resolve mint for signal")
+				}
 			}
 			
 			// Send to TUI

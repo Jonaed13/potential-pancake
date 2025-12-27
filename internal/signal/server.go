@@ -14,7 +14,7 @@ type Handler struct {
 	signalChan  chan *Signal
 	minEntry    func() float64
 	takeProfit  func() float64
-	resolveMint func(string) string
+	resolveMint func(string) (string, error)
 }
 
 // NewHandler creates a signal handler
@@ -22,7 +22,7 @@ func NewHandler(
 	signalChan chan *Signal,
 	minEntry func() float64,
 	takeProfit func() float64,
-	resolveMint func(string) string,
+	resolveMint func(string) (string, error),
 ) *Handler {
 	return &Handler{
 		parser:      NewParser(),
@@ -102,7 +102,11 @@ func (s *Server) handleSignal(c *fiber.Ctx) error {
 
 	// Resolve mint if not already present
 	if signal.Mint == "" && s.handler.resolveMint != nil {
-		signal.Mint = s.handler.resolveMint(signal.TokenName)
+		if mint, err := s.handler.resolveMint(signal.TokenName); err == nil {
+			signal.Mint = mint
+		} else {
+			log.Warn().Err(err).Str("token", signal.TokenName).Msg("failed to resolve mint")
+		}
 	}
 
 	log.Info().
