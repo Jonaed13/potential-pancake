@@ -206,18 +206,15 @@ func (c *RPCClient) callURL(ctx context.Context, url string, rpcReq RPCRequest, 
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("http status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var rpcResp RPCResponse
-	if err := json.Unmarshal(respBody, &rpcResp); err != nil {
-		return fmt.Errorf("unmarshal response: %w", err)
+	// Optimized: Use Decoder to stream response instead of ReadAll+Unmarshal
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		return fmt.Errorf("decode response: %w", err)
 	}
 
 	if rpcResp.Error != nil {
