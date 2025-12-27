@@ -26,7 +26,122 @@ type Position struct {
 	Reached2X    bool
 	PartialSold  bool   // True if partial profit has been taken
 	TokenBalance uint64 // Real-time balance from WebSocket
+
+	mu         sync.RWMutex
+	LastUpdate time.Time
 }
+
+// Snapshot returns a thread-safe copy of the position
+func (p *Position) Snapshot() *Position {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return &Position{
+		Mint:         p.Mint,
+		TokenName:    p.TokenName,
+		Size:         p.Size,
+		EntryValue:   p.EntryValue,
+		EntryUnit:    p.EntryUnit,
+		EntryTime:    p.EntryTime,
+		EntryTxSig:   p.EntryTxSig,
+		MsgID:        p.MsgID,
+		PoolAddr:     p.PoolAddr,
+		CurrentValue: p.CurrentValue,
+		PnLSol:       p.PnLSol,
+		PnLPercent:   p.PnLPercent,
+		Reached2X:    p.Reached2X,
+		PartialSold:  p.PartialSold,
+		TokenBalance: p.TokenBalance,
+		LastUpdate:   p.LastUpdate,
+		// mu is zero value (unlocked)
+	}
+}
+
+// UpdateStats updates the position statistics safely and returns the PnL multiple
+func (p *Position) UpdateStats(currentValSol float64, tokenBalance uint64) float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.TokenBalance = tokenBalance
+	p.PnLSol = currentValSol - p.Size
+	p.LastUpdate = time.Now()
+
+	multiple := 0.0
+	if p.Size > 0 {
+		multiple = currentValSol / p.Size
+		p.PnLPercent = (multiple - 1.0) * 100
+		// Fix: Maintain CurrentValue in EntryValue units (e.g. MCAP)
+		p.CurrentValue = multiple * p.EntryValue
+	}
+	return multiple
+}
+
+func (p *Position) SetReached2X(reached bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Reached2X = reached
+}
+
+func (p *Position) IsReached2X() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.Reached2X
+}
+
+func (p *Position) SetPartialSold(sold bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.PartialSold = sold
+}
+
+func (p *Position) IsPartialSold() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.PartialSold
+}
+
+func (p *Position) SetEntryTxSig(sig string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.EntryTxSig = sig
+}
+
+func (p *Position) GetEntryTxSig() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.EntryTxSig
+}
+
+func (p *Position) GetLastUpdate() time.Time {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.LastUpdate
+}
+
+func (p *Position) SetTokenBalance(balance uint64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.TokenBalance = balance
+}
+
+func (p *Position) SetStatsFromSignal(val float64, unit string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	realVal := val
+	if unit == "X" {
+		realVal = val * 100 // Convert 2.0X -> 200% for display consistency if needed
+		// Note: Legacy code did this. We keep it or adapt.
+		// Legacy: val = signal.Value * 100
+	}
+	// Legacy override logic from executeBuyFast
+	p.CurrentValue = realVal
+	if p.EntryValue > 0 {
+		p.PnLPercent = ((p.CurrentValue / p.EntryValue) - 1) * 100
+	}
+	p.LastUpdate = time.Now()
+}
+
 
 // PositionTracker manages active positions
 type PositionTracker struct {
@@ -62,14 +177,12 @@ func (pt *PositionTracker) loadFromDB() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 	
-	// FIX: Track how many we skip as stale
 	loaded := 0
 	stale := 0
 	
 	for _, p := range positions {
 		entryTime := time.Unix(p.EntryTime, 0)
 		
-		// FIX: Skip positions older than 24 hours (stale data)
 		if time.Since(entryTime) > 24*time.Hour {
 			stale++
 			log.Debug().
@@ -79,7 +192,6 @@ func (pt *PositionTracker) loadFromDB() {
 			continue
 		}
 		
-		// Skip PENDING positions older than 10 minutes
 		if p.EntryTxSig == "PENDING" && time.Since(entryTime) > 10*time.Minute {
 			stale++
 			log.Debug().Str("token", p.TokenName).Msg("skipping old PENDING position")
@@ -95,8 +207,8 @@ func (pt *PositionTracker) loadFromDB() {
 			EntryTime:    entryTime,
 			EntryTxSig:   p.EntryTxSig,
 			MsgID:        p.MsgID,
-			CurrentValue: p.EntryValue, // Initialize to entry value
-			PnLPercent:   0,            // Start at 0% until updated
+			CurrentValue: p.EntryValue,
+			PnLPercent:   0,
 		}
 		loaded++
 	}
@@ -159,7 +271,7 @@ func (pt *PositionTracker) Add(pos *Position) error {
 			EntryValue: pos.EntryValue,
 			EntryUnit:  pos.EntryUnit,
 			EntryTime:  pos.EntryTime.Unix(),
-			EntryTxSig: pos.EntryTxSig,
+			EntryTxSig: pos.GetEntryTxSig(), // Use getter
 			MsgID:      pos.MsgID,
 		}
 		return pt.db.InsertPosition(dbPos)
@@ -181,7 +293,7 @@ func (pt *PositionTracker) Remove(mint string) (*Position, error) {
 	return pos, nil
 }
 
-// GetAll returns all open positions
+// GetAll returns all open positions (live pointers)
 func (pt *PositionTracker) GetAll() []*Position {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
@@ -191,6 +303,18 @@ func (pt *PositionTracker) GetAll() []*Position {
 		positions = append(positions, p)
 	}
 	return positions
+}
+
+// GetAllSnapshots returns thread-safe copies of all positions (for TUI)
+func (pt *PositionTracker) GetAllSnapshots() []*Position {
+	pt.mu.RLock()
+	defer pt.mu.RUnlock()
+
+	snaps := make([]*Position, 0, len(pt.positions))
+	for _, p := range pt.positions {
+		snaps = append(snaps, p.Snapshot())
+	}
+	return snaps
 }
 
 // SetMaxPositions updates the max positions limit

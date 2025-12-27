@@ -201,40 +201,35 @@ func (e *ExecutorFast) handleRealTimePriceUpdate(update ws.PriceUpdate) {
 		e.positions.Remove(update.Mint)
 		return
 	}
-	pos.TokenBalance = update.TokenBalance
 
 	// Real-time price check (if price available from WebSocket)
 	if update.PriceSOL > 0 {
 		// Calculate current value
 		currentValueSOL := update.PriceSOL * float64(update.TokenBalance)
 
-		// Calculate PnL multiple
-		if pos.Size > 0 {
-			multiple := currentValueSOL / pos.Size
-			pos.PnLPercent = (multiple - 1) * 100
-			pos.CurrentValue = multiple * pos.EntryValue // Scale entry value
+		// Calculate PnL multiple safely
+		multiple := pos.UpdateStats(currentValueSOL, update.TokenBalance)
 
-			// INSTANT 2X CHECK (per ms, not per 5 seconds!)
-			cfg := e.cfg.GetTrading()
-			if cfg.AutoTradingEnabled && multiple >= cfg.TakeProfitMultiple && !pos.Reached2X {
-				pos.Reached2X = true
-				log.Info().
-					Str("token", pos.TokenName).
-					Float64("multiple", multiple).
-					Msg("🚀 REAL-TIME 2X DETECTED - TRIGGERING AUTO-SELL")
+		// INSTANT 2X CHECK (per ms, not per 5 seconds!)
+		cfg := e.cfg.GetTrading()
+		if cfg.AutoTradingEnabled && multiple >= cfg.TakeProfitMultiple && !pos.IsReached2X() {
+			pos.SetReached2X(true)
+			log.Info().
+				Str("token", pos.TokenName).
+				Float64("multiple", multiple).
+				Msg("🚀 REAL-TIME 2X DETECTED - TRIGGERING AUTO-SELL")
 
-				// Trigger sell immediately
-				go func() {
-					signal := &signalPkg.Signal{
-						Mint:      update.Mint,
-						TokenName: pos.TokenName,
-						Type:      signalPkg.SignalExit,
-						Value:     multiple,
-						Unit:      "X",
-					}
-					e.executeSellFast(context.Background(), signal, NewTradeTimer())
-				}()
-			}
+			// Trigger sell immediately
+			go func() {
+				signal := &signalPkg.Signal{
+					Mint:      update.Mint,
+					TokenName: pos.TokenName,
+					Type:      signalPkg.SignalExit,
+					Value:     multiple,
+					Unit:      "X",
+				}
+				e.executeSellFast(context.Background(), signal, NewTradeTimer())
+			}()
 		}
 
 		log.Debug().
@@ -242,6 +237,9 @@ func (e *ExecutorFast) handleRealTimePriceUpdate(update ws.PriceUpdate) {
 			Float64("price", update.PriceSOL).
 			Float64("pnl", pos.PnLPercent).
 			Msg("real-time price update")
+	} else {
+		// Just update balance if no price
+		pos.SetTokenBalance(update.TokenBalance)
 	}
 }
 
@@ -338,15 +336,7 @@ func (e *ExecutorFast) executeBuyFast(ctx context.Context, signal *signalPkg.Sig
 		// Update CurrentValue and PnL even if we don't buy
 		pos := e.positions.Get(signal.Mint)
 		if pos != nil {
-			var val float64 = signal.Value
-			if signal.Unit == "X" {
-				val = signal.Value * 100 // Convert 2.0X -> 200%
-			}
-
-			pos.CurrentValue = val
-			if pos.EntryValue > 0 {
-				pos.PnLPercent = ((pos.CurrentValue / pos.EntryValue) - 1) * 100
-			}
+			pos.SetStatsFromSignal(signal.Value, signal.Unit)
 			// Update DB
 			e.positions.Add(pos)
 		}
@@ -503,19 +493,11 @@ func (e *ExecutorFast) executeBuyFast(ctx context.Context, signal *signalPkg.Sig
 func (e *ExecutorFast) executeSellFast(ctx context.Context, signal *signalPkg.Signal, timer *TradeTimer) error {
 	// Update position value for TUI display before selling
 	if pos := e.positions.Get(signal.Mint); pos != nil {
-		var val float64 = signal.Value
-		if signal.Unit == "X" {
-			val = signal.Value * 100 // Convert 2.0X -> 200%
-		}
-
-		pos.CurrentValue = val
-		if pos.EntryValue > 0 {
-			pos.PnLPercent = ((pos.CurrentValue / pos.EntryValue) - 1) * 100
-		}
+		pos.SetStatsFromSignal(signal.Value, signal.Unit)
 
 		// FIX: Prevent double counting of 2X hits
-		if !pos.Reached2X {
-			pos.Reached2X = true
+		if !pos.IsReached2X() {
+			pos.SetReached2X(true)
 			e.Increment2XHit()
 		}
 		e.positions.Add(pos) // Update DB
@@ -836,7 +818,7 @@ func (e *ExecutorFast) StartMonitoring(ctx context.Context) {
 }
 
 func (e *ExecutorFast) monitorPositions(ctx context.Context) {
-	positions := e.positions.GetAll()
+	positions := e.positions.GetAll() // Get live pointers to update them
 	if len(positions) == 0 {
 		return
 	}
@@ -854,12 +836,17 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 		go func(pos *Position) {
 			defer wg.Done()
 
+			// Optimization: Skip RPC check if position was updated recently via WebSocket
+			if time.Since(pos.GetLastUpdate()) < 2*time.Second {
+				return
+			}
+
 			// Acquire semaphore
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
 			// FIX: Handle stale PENDING positions (failed buys)
-			if pos.EntryTxSig == "PENDING" {
+			if pos.GetEntryTxSig() == "PENDING" {
 				// If pending for more than PendingPositionTTL, mark as failed
 				if time.Since(pos.EntryTime) > PendingPositionTTL {
 					log.Warn().
@@ -882,14 +869,14 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 
 			if balance == 0 {
 				// Position has 0 tokens - either sold externally or buy failed
-				if pos.EntryTxSig != "PENDING" && pos.EntryTxSig != "FAILED" {
+				if pos.GetEntryTxSig() != "PENDING" && pos.GetEntryTxSig() != "FAILED" {
 					// Was a real position that now has 0 tokens
 					log.Warn().
 						Str("token", pos.TokenName).
 						Msg("position has 0 tokens - marking as sold/failed")
-					pos.CurrentValue = 0
+					pos.SetStatsFromSignal(0, "X") // safe update
 					pos.PnLPercent = -100 // Show as total loss
-					pos.EntryTxSig = "FAILED"
+					pos.SetEntryTxSig("FAILED")
 					// Keep it visible for FailedPositionTTL then remove
 					if time.Since(pos.EntryTime) > FailedPositionTTL {
 						e.positions.Remove(pos.Mint)
@@ -907,22 +894,12 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 			outAmount, _ := strconv.ParseUint(quote.OutAmount, 10, 64)
 			currentValSOL := float64(outAmount) / 1e9
 
-			// Update Position Stats
-			pos.CurrentValue = currentValSOL
-			pos.PnLSol = currentValSOL - pos.Size
-			if pos.Size > 0 {
-				pos.PnLPercent = ((currentValSOL / pos.Size) - 1.0) * 100
-			}
-
-			// Logic: 2X Detection
-			multiple := 0.0
-			if pos.Size > 0 {
-				multiple = currentValSOL / pos.Size
-			}
+			// Update Position Stats safely
+			multiple := pos.UpdateStats(currentValSOL, balance)
 
 			if multiple >= cfg.TakeProfitMultiple { // Use config multiple (e.g. 2.0)
-				if !pos.Reached2X {
-					pos.Reached2X = true
+				if !pos.IsReached2X() {
+					pos.SetReached2X(true)
 					log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("reached target! marked as win")
 					e.Increment2XHit()
 				}
@@ -949,7 +926,7 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 
 			// Logic: Partial Profit-Taking
 			if cfg.PartialProfitPercent > 0 && cfg.PartialProfitMultiple > 1.0 {
-				if multiple >= cfg.PartialProfitMultiple && !pos.PartialSold {
+				if multiple >= cfg.PartialProfitMultiple && !pos.IsPartialSold() {
 					log.Info().Str("token", pos.TokenName).Float64("mult", multiple).Msg("triggering partial profit take")
 					e.executePartialSell(ctx, pos, cfg.PartialProfitPercent)
 				}
@@ -1005,13 +982,13 @@ func (e *ExecutorFast) executePartialSell(ctx context.Context, pos *Position, pe
 	}
 
 	// 3. Update Position State
-	pos.PartialSold = true
+	pos.SetPartialSold(true)
 	log.Info().Str("txSig", txSig).Msg("PARTIAL SELL executed ✓")
 }
 
-// GetOpenPositions returns all open positions
+// GetOpenPositions returns all open positions (safe copies for TUI)
 func (e *ExecutorFast) GetOpenPositions() []*Position {
-	return e.positions.GetAll()
+	return e.positions.GetAllSnapshots()
 }
 
 // ClearPositions clears all positions (F9 clear)
