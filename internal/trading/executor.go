@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"sync"
+
 	"github.com/rs/zerolog/log"
 	"solana-pump-bot/internal/blockchain"
 	"solana-pump-bot/internal/config"
