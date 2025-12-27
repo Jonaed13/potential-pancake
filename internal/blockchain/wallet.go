@@ -18,7 +18,15 @@ type Wallet struct {
 	address    string
 }
 
-// NewWallet creates a wallet from a base58-encoded private key
+// NewWallet creates a wallet from a base58-encoded private key.
+//
+// SECURITY WARNING: This function accepts a private key as a plain string,
+// which is a significant security risk. Storing private keys in configuration
+// files or source code can lead to theft of funds.
+//
+// RECOMMENDED PRACTICE: Load the private key from a secure source at runtime,
+// such as an environment variable or a dedicated secret management service
+// (e.g., HashiCorp Vault, AWS Secrets Manager).
 func NewWallet(privateKeyBase58 string) (*Wallet, error) {
 	// Decode base58 private key
 	privateKeyBytes, err := base58.Decode(privateKeyBase58)

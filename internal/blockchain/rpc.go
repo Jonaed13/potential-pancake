@@ -71,12 +71,20 @@ type SendTxResult string
 
 // NewRPCClient creates a new RPC client
 func NewRPCClient(primaryURL, fallbackURL, apiKey string) *RPCClient {
+	// Configure HTTP transport for keep-alives and connection pooling
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
 	return &RPCClient{
 		primaryURL:  primaryURL,
 		fallbackURL: fallbackURL,
 		apiKey:      apiKey,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: transport,
 		},
 	}
 }
