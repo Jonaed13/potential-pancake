@@ -369,20 +369,18 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, keys.Left):
 			if m.UIMode == 4 {
-				if m.FocusPane == 1 && m.Signals.Offset > 0 {
-					m.Signals.Offset--
-				} else if m.FocusPane == 2 && m.Positions.Offset > 0 {
-					m.Positions.Offset--
+				// Mode 4: Focus Navigation (Left)
+				if m.FocusPane > 0 {
+					m.FocusPane--
 				}
 			} else {
 				if m.Signals.Offset > 0 { m.Signals.Offset-- }
 			}
 		case key.Matches(msg, keys.Right):
 			if m.UIMode == 4 {
-				if m.FocusPane == 1 && m.Signals.Offset < len(m.Signals.List)-1 {
-					m.Signals.Offset++
-				} else if m.FocusPane == 2 && m.Positions.Offset < len(m.Positions.Positions)-1 {
-					m.Positions.Offset++
+				// Mode 4: Focus Navigation (Right)
+				if m.FocusPane < 2 {
+					m.FocusPane++
 				}
 			} else {
 				if m.Signals.Offset < len(m.Signals.List)-1 { m.Signals.Offset++ }
@@ -1714,7 +1712,7 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB]Focus [↑↓]Scroll [Q]uit "
+	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
