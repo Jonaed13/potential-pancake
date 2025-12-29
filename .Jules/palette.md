@@ -1,6 +1,3 @@
-## 2024-03-24 - [Micro-UX Improvements to TUI Config]
-**Learning:** TUI configuration interfaces often lack visual affordances found in GUI settings menus. Users need immediate feedback on what actions are available and the boundaries of valid inputs. Adding explicit bounds checking (clamping) and visual indicators for boolean states (ON/OFF vs True/False) significantly improves confidence.
-**Action:** When designing TUI configuration screens, always include:
-1. Visible key hints (e.g., "[←/→] Adjust").
-2. Explicit visual states for toggles (Color-coded ON/OFF).
-3. "Invisible" safety rails (clamping values) to prevent invalid configurations.
+## 2024-05-23 - Helper Text Strategy
+**Learning:** Adding dynamic helper text to TUI modals significantly improves usability for complex configurations without cluttering the main interface.
+**Action:** For future TUI forms, reserve screen space (e.g., footer or dedicated area) for context-sensitive help that updates on selection change.

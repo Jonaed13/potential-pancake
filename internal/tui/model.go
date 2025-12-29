@@ -1306,7 +1306,23 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
-	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
+
+	// Helper text logic
+	descriptions := []string{
+		"Min signal strength to enter (Min: 10%)",
+		"Target multiplier to exit (Min: 1.5x)",
+		"Max portfolio % per trade (5-100%)",
+		"Max concurrent positions (1-50)",
+		"SOL fee for faster inclusion (0.0001-1.0)",
+		"Master switch for automated trading",
+	}
+	desc := ""
+	if cm.Selected >= 0 && cm.Selected < len(descriptions) {
+		desc = descriptions[cm.Selected]
+	}
+
+	s += "\n" + lipgloss.NewStyle().Foreground(ColorActive).Render(desc)
+	s += "\n\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
 
