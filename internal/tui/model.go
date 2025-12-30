@@ -1282,6 +1282,18 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	}
 	return *m, nil
 }
+func (cm ConfigModal) GetDescription() string {
+	switch cm.Selected {
+	case 0: return "Minimum signal score (%) required to enter a trade."
+	case 1: return "Multiplier target for taking profit (e.g. 2.0x)."
+	case 2: return "Max % of wallet balance to allocate per trade."
+	case 3: return "Max concurrent open positions allowed."
+	case 4: return "Priority fee (SOL) to speed up transactions."
+	case 5: return "Toggle automatic trade execution."
+	default: return "Select an option to configure."
+	}
+}
+
 func (cm ConfigModal) Render(w, h int) string {
 	t := cm.Cfg.GetTrading()
 	f := cm.Cfg.Get() // Get full config for Fees
@@ -1306,6 +1318,11 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add helper text for the selected option
+	desc := lipgloss.NewStyle().Foreground(ColorAccentPurple).Italic(true).Render(cm.GetDescription())
+	s += "\n" + desc + "\n"
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
