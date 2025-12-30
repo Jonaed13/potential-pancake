@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -429,8 +430,61 @@ func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint str
 
 	accounts := make([]TokenAccountInfo, 0, len(result.Value))
 	for _, v := range result.Value {
-		var amount uint64
-		fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+		// Optimization: Use ParseUint instead of Sscanf
+		amount, _ := strconv.ParseUint(v.Account.Data.Parsed.Info.TokenAmount.Amount, 10, 64)
+		accounts = append(accounts, TokenAccountInfo{
+			Address:  v.Pubkey,
+			Mint:     v.Account.Data.Parsed.Info.Mint,
+			Amount:   amount,
+			Decimals: v.Account.Data.Parsed.Info.TokenAmount.Decimals,
+		})
+	}
+
+	return accounts, nil
+}
+
+// GetAllTokenAccounts fetches all token accounts for an owner (using Token Program ID)
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	const tokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "getTokenAccountsByOwner",
+		Params: []interface{}{
+			owner,
+			map[string]string{"programId": tokenProgramID},
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
+	}
+
+	var result struct {
+		Value []struct {
+			Pubkey  string `json:"pubkey"`
+			Account struct {
+				Data struct {
+					Parsed struct {
+						Info struct {
+							Mint        string `json:"mint"`
+							TokenAmount struct {
+								Amount   string `json:"amount"`
+								Decimals uint8  `json:"decimals"`
+							} `json:"tokenAmount"`
+						} `json:"info"`
+					} `json:"parsed"`
+				} `json:"data"`
+			} `json:"account"`
+		} `json:"value"`
+	}
+
+	if err := c.call(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	accounts := make([]TokenAccountInfo, 0, len(result.Value))
+	for _, v := range result.Value {
+		amount, _ := strconv.ParseUint(v.Account.Data.Parsed.Info.TokenAmount.Amount, 10, 64)
 		accounts = append(accounts, TokenAccountInfo{
 			Address:  v.Pubkey,
 			Mint:     v.Account.Data.Parsed.Info.Mint,
