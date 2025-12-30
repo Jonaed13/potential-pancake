@@ -638,6 +638,20 @@ func (e *ExecutorFast) getTokenBalance(ctx context.Context, mint string) (uint64
 	return totalBalance, nil
 }
 
+// getAllTokenBalances fetches ALL token balances for the wallet in one go
+func (e *ExecutorFast) getAllTokenBalances(ctx context.Context) (map[string]uint64, error) {
+	accounts, err := e.rpc.GetAllTokenAccounts(ctx, e.wallet.Address())
+	if err != nil {
+		return nil, err
+	}
+
+	balances := make(map[string]uint64)
+	for _, acc := range accounts {
+		balances[acc.Mint] += acc.Amount
+	}
+	return balances, nil
+}
+
 // FIX #4: Duplicate signal protection
 func (e *ExecutorFast) isDuplicateSignal(msgID int64) bool {
 	e.mu.RLock()
@@ -823,6 +837,25 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 		return
 	}
 
+	// ⚡ Bolt Optimization: Batch fetch all balances
+	// Instead of N RPC calls, do 1 call to get all token accounts
+	var allBalances map[string]uint64
+	var err error
+
+	// Only fetch if not in simulation mode
+	if !e.simMode && !e.cfg.Get().Trading.SimulationMode {
+		allBalances, err = e.getAllTokenBalances(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to batch fetch token balances")
+			// Fallback to individual checks will happen in loop if map lookup fails?
+			// No, we'll assume 0 if map is missing, which is correct (balance 0)
+			// But if the RPC call failed entirely, we might falsely assume 0.
+			// So if err != nil, we should probably abort or fallback.
+			// Let's abort this cycle to avoid false 0s.
+			return
+		}
+	}
+
 	cfg := e.cfg.GetTrading()
 
 	// ⚡ Bolt Optimization: Parallelize position monitoring
@@ -858,13 +891,22 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 				}
 			}
 
-			// Get current token balance
-			balance, err := e.getTokenBalance(ctx, pos.Mint)
-
-			// FIX: Handle 0 balance - mark position as lost/failed
-			if err != nil {
-				log.Debug().Err(err).Str("mint", pos.Mint[:8]+"...").Msg("failed to get balance")
-				return
+			// Get current token balance (Optimized: O(1) lookup)
+			var balance uint64
+			if e.simMode || e.cfg.Get().Trading.SimulationMode {
+				balance = 1_000_000_000 // Mock balance
+			} else {
+				// If batch fetch worked, use it. If account missing, it's 0.
+				if allBalances != nil {
+					balance = allBalances[pos.Mint]
+				} else {
+					// Fallback if batch failed (shouldn't reach here due to early return above)
+					// But for safety/completeness:
+					b, err := e.getTokenBalance(ctx, pos.Mint)
+					if err == nil {
+						balance = b
+					}
+				}
 			}
 
 			if balance == 0 {
