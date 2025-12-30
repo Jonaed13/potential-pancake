@@ -332,7 +332,21 @@ func initComponents() (
 	if wallet != nil {
 		// Initialize RPC client
 		rpcCfg := cfg.Get().RPC
-		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+
+		// Construct URLs with API keys if present
+		shyftURL := rpcCfg.ShyftURL
+		// We pass the key separately for headers, but some endpoints might strictly need it in query
+
+		fallbackURL := rpcCfg.FallbackURL
+		if key := cfg.GetFallbackAPIKey(); key != "" {
+			if strings.Contains(fallbackURL, "?") {
+				fallbackURL += "&api-key=" + key
+			} else {
+				fallbackURL += "?api-key=" + key
+			}
+		}
+
+		rpc = blockchain.NewRPCClient(shyftURL, fallbackURL, cfg.GetShyftAPIKey())
 
 		// Initialize blockhash cache
 		blockhashCache = blockchain.NewBlockhashCache(
