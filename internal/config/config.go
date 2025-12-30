@@ -30,9 +30,10 @@ type WalletConfig struct {
 }
 
 type RPCConfig struct {
-	ShyftURL      string `mapstructure:"shyft_url"`
-	ShyftAPIKeyEnv string `mapstructure:"shyft_api_key_env"`
-	FallbackURL   string `mapstructure:"fallback_url"`
+	ShyftURL          string `mapstructure:"shyft_url"`
+	ShyftAPIKeyEnv    string `mapstructure:"shyft_api_key_env"`
+	FallbackURL       string `mapstructure:"fallback_url"`
+	FallbackAPIKeyEnv string `mapstructure:"fallback_api_key_env"`
 }
 
 type TradingConfig struct {
@@ -225,6 +226,13 @@ func (m *Manager) GetShyftAPIKey() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+}
+
+// GetFallbackAPIKey loads Fallback API key from environment
+func (m *Manager) GetFallbackAPIKey() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return os.Getenv(m.config.RPC.FallbackAPIKeyEnv)
 }
 
 // GetBlockhashRefresh returns blockhash refresh interval as duration
