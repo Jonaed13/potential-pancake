@@ -461,6 +461,18 @@ func (m *Model) adjustConfig(delta float64) {
 	})
 }
 
+func (cm ConfigModal) GetDescription(index int) string {
+	switch index {
+	case 0: return "Minimum signal confidence to enter a trade"
+	case 1: return "Target multiplier to sell (e.g., 2.0x = +100%)"
+	case 2: return "Percentage of wallet balance to use per trade"
+	case 3: return "Maximum number of simultaneous open positions"
+	case 4: return "Additional fee (SOL) to speed up transactions"
+	case 5: return "Master switch to enable/disable automated trading"
+	default: return ""
+	}
+}
+
 
 // --- VIEW RENDERING ---
 
@@ -1306,6 +1318,13 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add description
+	desc := cm.GetDescription(cm.Selected)
+	if desc != "" {
+		s += "\n" + lipgloss.NewStyle().Foreground(ColorAccentPurple).Italic(true).Render(desc) + "\n"
+	}
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
