@@ -64,6 +64,9 @@ var (
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ColorBorder).
 		Padding(1, 2)
+	StyleHelpText = lipgloss.NewStyle().
+		Foreground(ColorAccentPurple).
+		Italic(true)
 )
 
 func RenderHotKey(k, d string) string {
@@ -1306,8 +1309,27 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add helper description
+	desc := cm.GetDescription(cm.Selected)
+	if desc != "" {
+		s += "\n" + StyleHelpText.Render(desc) + "\n"
+	}
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
+}
+
+func (cm ConfigModal) GetDescription(index int) string {
+	switch index {
+	case 0: return "Minimum signal strength to auto-enter (10-1000%)"
+	case 1: return "Multiplier to exit for profit (e.g. 2.0x)"
+	case 2: return "Max portfolio percentage per trade (5-100%)"
+	case 3: return "Maximum concurrent open positions (1-50)"
+	case 4: return "Solana priority fee in SOL (0.0001-1.0)"
+	case 5: return "Toggle automated trading ON/OFF"
+	default: return ""
+	}
 }
 
 // 6. LOGS VIEW
