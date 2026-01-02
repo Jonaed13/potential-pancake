@@ -64,6 +64,11 @@ var (
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ColorBorder).
 		Padding(1, 2)
+
+	StyleHelpText = lipgloss.NewStyle().
+		Foreground(ColorText).
+		Faint(true).
+		Italic(true)
 )
 
 func RenderHotKey(k, d string) string {
@@ -1265,6 +1270,19 @@ type ConfigModal struct {
 func NewConfigModal(cfg *config.Manager) ConfigModal {
 	return ConfigModal{Cfg: cfg, Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"}, Selected: 0}
 }
+
+func (cm ConfigModal) GetDescription(idx int) string {
+	switch idx {
+	case 0: return "Minimum signal strength to enter trade"
+	case 1: return "Multiplier for taking profit (e.g. 1.5x)"
+	case 2: return "Max percentage of wallet to use per trade"
+	case 3: return "Maximum number of simultaneous open positions"
+	case 4: return "Static priority fee in SOL for faster transactions"
+	case 5: return "Enable or disable automatic trading execution"
+	default: return ""
+	}
+}
+
 func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -1307,6 +1325,11 @@ func (cm ConfigModal) Render(w, h int) string {
 		s += cursor + r + "\n"
 	}
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
+
+	if desc := cm.GetDescription(cm.Selected); desc != "" {
+		s += "\n\n" + StyleHelpText.Render(desc)
+	}
+
 	return StyleModal.Render(s)
 }
 
