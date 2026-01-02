@@ -1,8 +1,32 @@
-.env
-data/
+# Binaries
 bin/
+bot
+pump-bot
+afnex-bot
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Data and logs
+data/
 logs/
-telegram/venv/
-telegram/__pycache__/
-*.session
-*.session-journal
+*.log
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+.venv
+venv/
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Go
+go.work
+go.work.sum
