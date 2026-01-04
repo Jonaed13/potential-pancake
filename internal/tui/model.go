@@ -1306,8 +1306,21 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
-	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
+	s += "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Italic(true).Render(cm.GetDescription(cm.Selected))
+	s += "\n\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
+}
+
+func (cm ConfigModal) GetDescription(index int) string {
+	switch index {
+	case 0: return "Minimum signal score to enter a trade (0-100)."
+	case 1: return "Multiplier to exit for profit (e.g. 2.0x)."
+	case 2: return "Max percentage of wallet balance per trade."
+	case 3: return "Maximum number of concurrent open positions."
+	case 4: return "Additional fee (SOL) to speed up transactions."
+	case 5: return "Enable/Disable automatic trading execution."
+	default: return ""
+	}
 }
 
 // 6. LOGS VIEW
