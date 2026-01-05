@@ -332,7 +332,28 @@ func initComponents() (
 	if wallet != nil {
 		// Initialize RPC client
 		rpcCfg := cfg.Get().RPC
-		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+		shyftKey := cfg.GetShyftAPIKey()
+		heliusKey := cfg.GetHeliusAPIKey()
+
+		// Construct secure URLs with API keys injected at runtime
+		// Shyft: Append key to URL for WebSocket (required) and use for header in RPC
+		shyftWsURL := cfg.Get().WebSocket.ShyftURL
+		if shyftKey != "" && !strings.Contains(shyftWsURL, "api_key") {
+			shyftWsURL = fmt.Sprintf("%s?api_key=%s", shyftWsURL, shyftKey)
+		}
+
+		// Update config in memory so other components (like ExecutorFast) see the secure URL
+		cfg.Update(func(c *config.Config) {
+			c.WebSocket.ShyftURL = shyftWsURL
+		})
+
+		// Helius: Append key to fallback URL (query param required)
+		fallbackURL := rpcCfg.FallbackURL
+		if heliusKey != "" && !strings.Contains(fallbackURL, "api-key") {
+			fallbackURL = fmt.Sprintf("%s/?api-key=%s", strings.TrimRight(fallbackURL, "/"), heliusKey)
+		}
+
+		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, fallbackURL, shyftKey)
 
 		// Initialize blockhash cache
 		blockhashCache = blockchain.NewBlockhashCache(
