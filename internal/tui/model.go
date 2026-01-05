@@ -1265,6 +1265,26 @@ type ConfigModal struct {
 func NewConfigModal(cfg *config.Manager) ConfigModal {
 	return ConfigModal{Cfg: cfg, Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"}, Selected: 0}
 }
+
+func (cm ConfigModal) GetDescription(index int) string {
+	switch index {
+	case 0:
+		return "Minimum signal strength required to enter a trade."
+	case 1:
+		return "Multiplier to sell position (e.g. 1.5x = 50% profit)."
+	case 2:
+		return "Maximum % of wallet balance to use per trade."
+	case 3:
+		return "Maximum number of simultaneous open positions."
+	case 4:
+		return "Extra SOL fee paid to miners for faster inclusion."
+	case 5:
+		return "Master switch to enable/disable automated trading."
+	default:
+		return ""
+	}
+}
+
 func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -1306,6 +1326,11 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add helper text
+	desc := cm.GetDescription(cm.Selected)
+	s += "\n" + lipgloss.NewStyle().Foreground(ColorGray).Italic(true).Render(desc) + "\n"
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
