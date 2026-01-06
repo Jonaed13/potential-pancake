@@ -60,6 +60,7 @@ var (
 	ColorGray        = ColorText
 	StyleTableHeader = lipgloss.NewStyle().Foreground(ColorActive).Bold(true)
 	StyleFooter      = lipgloss.NewStyle().Foreground(ColorText)
+	StyleHelpText    = lipgloss.NewStyle().Foreground(ColorText).Faint(true).Italic(true)
 	StyleModal       = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ColorBorder).
@@ -1282,6 +1283,19 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	}
 	return *m, nil
 }
+
+func (cm ConfigModal) GetDescription() string {
+	switch cm.Selected {
+	case 0: return "Minimum signal confidence to enter a trade (10-100%)"
+	case 1: return "Multiplier to exit position (1.5x+)"
+	case 2: return "Max percentage of wallet to allocate per trade"
+	case 3: return "Maximum concurrent open positions"
+	case 4: return "Jito/Priority fee in SOL to speed up txs"
+	case 5: return "Toggle automated trading execution"
+	default: return "Adjust configuration values"
+	}
+}
+
 func (cm ConfigModal) Render(w, h int) string {
 	t := cm.Cfg.GetTrading()
 	f := cm.Cfg.Get() // Get full config for Fees
@@ -1306,6 +1320,11 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add context-sensitive help text
+	helpText := cm.GetDescription()
+	s += "\n" + StyleHelpText.Render(helpText) + "\n"
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
