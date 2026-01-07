@@ -64,6 +64,11 @@ var (
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ColorBorder).
 		Padding(1, 2)
+
+	StyleHelpText    = lipgloss.NewStyle().
+		Foreground(ColorText).
+		Faint(true).
+		Italic(true)
 )
 
 func RenderHotKey(k, d string) string {
@@ -1282,6 +1287,19 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	}
 	return *m, nil
 }
+
+func (cm ConfigModal) GetDescription() string {
+	switch cm.Selected {
+	case 0: return "Minimum signal strength to enter a trade"
+	case 1: return "Multiplier target to sell (e.g. 2.0x)"
+	case 2: return "Max % of wallet to use per trade"
+	case 3: return "Maximum concurrent open positions"
+	case 4: return "SOL fee paid to miners for speed"
+	case 5: return "Master switch for automated trading"
+	default: return "Adjust settings"
+	}
+}
+
 func (cm ConfigModal) Render(w, h int) string {
 	t := cm.Cfg.GetTrading()
 	f := cm.Cfg.Get() // Get full config for Fees
@@ -1306,7 +1324,9 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
-	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
+
+	s += "\n" + StyleHelpText.Render(cm.GetDescription())
+	s += "\n\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
 
