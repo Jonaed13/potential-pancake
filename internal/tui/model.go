@@ -60,6 +60,7 @@ var (
 	ColorGray        = ColorText
 	StyleTableHeader = lipgloss.NewStyle().Foreground(ColorActive).Bold(true)
 	StyleFooter      = lipgloss.NewStyle().Foreground(ColorText)
+	StyleHelpText    = lipgloss.NewStyle().Foreground(ColorText).Faint(true)
 	StyleModal       = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ColorBorder).
@@ -1257,14 +1258,29 @@ func (pp PositionsPane) Render(w, h int) string {
 }
 
 // 5. CONFIG MODAL
+type ConfigItem struct {
+	Label       string
+	Description string
+}
+
 type ConfigModal struct {
-	Cfg *config.Manager
-	Fields []string
+	Cfg      *config.Manager
+	Items    []ConfigItem
 	Selected int
 }
+
 func NewConfigModal(cfg *config.Manager) ConfigModal {
-	return ConfigModal{Cfg: cfg, Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"}, Selected: 0}
+	items := []ConfigItem{
+		{"Min Entry %", "Minimum signal strength % required to enter a trade.\nHigher = safer but fewer trades."},
+		{"Take Profit", "Profit target multiplier (e.g. 1.5x = +50% gain).\nBot will attempt to sell when this is reached."},
+		{"Max Alloc %", "Maximum % of wallet balance to allocate per trade.\nCaps your risk exposure per position."},
+		{"Max Pos", "Maximum number of simultaneous open positions.\nPrevents over-exposure in volatile markets."},
+		{"Priority Fee", "Additional fee paid to miners for faster inclusion.\nCritical during network congestion."},
+		{"Auto Trade", "Master switch for automated trading.\nOFF = Monitoring only (no buys)."},
+	}
+	return ConfigModal{Cfg: cfg, Items: items, Selected: 0}
 }
+
 func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
@@ -1274,7 +1290,7 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Up):
 		if cm.Selected > 0 { m.ConfigModal.Selected-- }
 	case key.Matches(msg, keys.Down):
-		if cm.Selected < len(cm.Fields)-1 { m.ConfigModal.Selected++ }
+		if cm.Selected < len(cm.Items)-1 { m.ConfigModal.Selected++ }
 	case key.Matches(msg, keys.Left):
 		m.adjustConfig(-1)
 	case key.Matches(msg, keys.Right):
@@ -1282,6 +1298,14 @@ func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	}
 	return *m, nil
 }
+
+func (cm ConfigModal) GetDescription(index int) string {
+	if index >= 0 && index < len(cm.Items) {
+		return cm.Items[index].Description
+	}
+	return ""
+}
+
 func (cm ConfigModal) Render(w, h int) string {
 	t := cm.Cfg.GetTrading()
 	f := cm.Cfg.Get() // Get full config for Fees
@@ -1306,7 +1330,13 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
-	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
+
+	desc := cm.GetDescription(cm.Selected)
+	if desc != "" {
+		s += "\n" + StyleHelpText.Render(desc)
+	}
+
+	s += "\n\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
 

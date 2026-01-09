@@ -4,3 +4,7 @@
 1. Visible key hints (e.g., "[←/→] Adjust").
 2. Explicit visual states for toggles (Color-coded ON/OFF).
 3. "Invisible" safety rails (clamping values) to prevent invalid configurations.
+
+## 2024-03-25 - [Contextual Help in TUI Menus]
+**Learning:** The TUI framework being used (Bubble Tea) combined with manual string concatenation for rendering (as seen in `Render` methods) makes layout management tricky. However, adding a struct-based configuration approach (`ConfigItem`) proved to be a reusable pattern for managing lists of items with associated metadata (like descriptions) in TUI menus, avoiding "magic number" indexing issues.
+**Action:** Future TUI menu components should use a struct-based slice pattern (Label, Description, Value Accessor/Mutator) rather than parallel arrays or hardcoded indices.

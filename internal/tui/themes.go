@@ -89,5 +89,6 @@ func ApplyTheme(t Theme) {
 	StyleTableHeader = lipgloss.NewStyle().Foreground(ColorActive).Bold(true)
 	StyleFooter = lipgloss.NewStyle().Foreground(ColorText)
 	StyleModal = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(ColorBorder).Padding(1, 2)
+	StyleHelpText = lipgloss.NewStyle().Foreground(ColorText).Faint(true)
 	ColorGray = ColorText
 }
