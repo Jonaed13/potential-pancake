@@ -1687,12 +1687,19 @@ func (m Model) renderNeonDashboard() string {
 	// ─── ASSEMBLY ───
 	
 	// Header
+	statusText := "[LIVE] 🔴 REC"
+	statusColor := neonGreen
+	if !m.Running {
+		statusText = "[PAUSED] ⏸"
+		statusColor = lipgloss.Color("#ff5555")
+	}
+
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(neonGreen).
+		Foreground(statusColor).
 		Align(lipgloss.Center).
 		Width(w).
-		Render(fmt.Sprintf("⚡ AFNEX COMMAND CENTER ⚡   [LIVE] 🔴 REC  %s", time.Now().Format("15:04:05")))
+		Render(fmt.Sprintf("⚡ AFNEX COMMAND CENTER ⚡   %s  %s", statusText, time.Now().Format("15:04:05")))
 		
 	// Grid
 	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, centerPanel, rightPanel)
@@ -1712,7 +1719,8 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
+	// [TAB]Focus [C]onfig [P]ause [S]ell [Q]uit
+	controls := "[TAB]Focus [C]fg [P]ause [S]ell [Q]uit "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
