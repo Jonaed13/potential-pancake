@@ -30,9 +30,10 @@ type WalletConfig struct {
 }
 
 type RPCConfig struct {
-	ShyftURL      string `mapstructure:"shyft_url"`
+	ShyftURL       string `mapstructure:"shyft_url"`
 	ShyftAPIKeyEnv string `mapstructure:"shyft_api_key_env"`
-	FallbackURL   string `mapstructure:"fallback_url"`
+	HeliusAPIKeyEnv string `mapstructure:"helius_api_key_env"`
+	FallbackURL    string `mapstructure:"fallback_url"`
 }
 
 type TradingConfig struct {
@@ -113,6 +114,7 @@ func NewManager(configPath string) (*Manager, error) {
 	v.SetDefault("jupiter.slippage_bps", 500) // 5%
 	v.SetDefault("jupiter.timeout_seconds", 10)
 	v.SetDefault("rpc.shyft_api_key_env", "SHYFT_API_KEY")
+	v.SetDefault("rpc.helius_api_key_env", "HELIUS_API_KEY")
 	v.SetDefault("rpc.fallback_url", "https://api.mainnet-beta.solana.com")
 	v.SetDefault("storage.sqlite_path", "./data/bot.db")
 	v.SetDefault("storage.signals_buffer_size", 100)
@@ -225,6 +227,13 @@ func (m *Manager) GetShyftAPIKey() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+}
+
+// GetHeliusAPIKey loads Helius API key from environment
+func (m *Manager) GetHeliusAPIKey() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return os.Getenv(m.config.RPC.HeliusAPIKeyEnv)
 }
 
 // GetBlockhashRefresh returns blockhash refresh interval as duration
