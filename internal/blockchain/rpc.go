@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -169,7 +170,7 @@ func (c *RPCClient) GetTokenAccountBalance(ctx context.Context, tokenAccount str
 	}
 
 	var amount uint64
-	fmt.Sscanf(result.Value.Amount, "%d", &amount)
+	amount, _ = strconv.ParseUint(result.Value.Amount, 10, 64)
 	return amount, result.Value.Decimals, nil
 }
 
@@ -429,8 +430,7 @@ func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint str
 
 	accounts := make([]TokenAccountInfo, 0, len(result.Value))
 	for _, v := range result.Value {
-		var amount uint64
-		fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+		amount, _ := strconv.ParseUint(v.Account.Data.Parsed.Info.TokenAmount.Amount, 10, 64)
 		accounts = append(accounts, TokenAccountInfo{
 			Address:  v.Pubkey,
 			Mint:     v.Account.Data.Parsed.Info.Mint,
