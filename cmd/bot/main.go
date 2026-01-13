@@ -281,6 +281,27 @@ func initComponents() (
 		log.Fatal().Err(err).Msg("failed to load config")
 	}
 
+	// Inject API keys into URLs in memory
+	cfg.Update(func(c *config.Config) {
+		// Inject Helius Key into Fallback URL
+		if key := os.Getenv(c.RPC.HeliusAPIKeyEnv); key != "" {
+			if !strings.Contains(c.RPC.FallbackURL, "api-key=") {
+				c.RPC.FallbackURL = fmt.Sprintf("%s/?api-key=%s", c.RPC.FallbackURL, key)
+			}
+		}
+
+		// Inject Shyft Key into WebSocket URL
+		if key := os.Getenv(c.RPC.ShyftAPIKeyEnv); key != "" {
+			if !strings.Contains(c.WebSocket.ShyftURL, "api_key=") {
+				if strings.Contains(c.WebSocket.ShyftURL, "?") {
+					c.WebSocket.ShyftURL += "&api_key=" + key
+				} else {
+					c.WebSocket.ShyftURL += "?api_key=" + key
+				}
+			}
+		}
+	})
+
 	// Load token cache
 	tokenCache, err := token.NewCache("config/tokens_cache.json")
 	if err != nil {
@@ -332,6 +353,7 @@ func initComponents() (
 	if wallet != nil {
 		// Initialize RPC client
 		rpcCfg := cfg.Get().RPC
+		// Note: FallbackURL already has key injected via cfg.Update above
 		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
 
 		// Initialize blockhash cache
