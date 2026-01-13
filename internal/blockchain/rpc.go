@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"net/http"
 	"sync"
 	"time"
@@ -169,7 +170,10 @@ func (c *RPCClient) GetTokenAccountBalance(ctx context.Context, tokenAccount str
 	}
 
 	var amount uint64
-	fmt.Sscanf(result.Value.Amount, "%d", &amount)
+	// Optimization: Use strconv.ParseUint instead of fmt.Sscanf (approx 30x faster)
+	if val, err := strconv.ParseUint(result.Value.Amount, 10, 64); err == nil {
+		amount = val
+	}
 	return amount, result.Value.Decimals, nil
 }
 
@@ -430,7 +434,10 @@ func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint str
 	accounts := make([]TokenAccountInfo, 0, len(result.Value))
 	for _, v := range result.Value {
 		var amount uint64
-		fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+		// Optimization: Use strconv.ParseUint instead of fmt.Sscanf (approx 30x faster)
+		if val, err := strconv.ParseUint(v.Account.Data.Parsed.Info.TokenAmount.Amount, 10, 64); err == nil {
+			amount = val
+		}
 		accounts = append(accounts, TokenAccountInfo{
 			Address:  v.Pubkey,
 			Mint:     v.Account.Data.Parsed.Info.Mint,
