@@ -75,7 +75,12 @@ func main() {
 		Timestamp: time.Now().Unix(),
 		MsgID:     1,
 	}
-	signal.Mint = resolver.Resolve(signal.TokenName)
+	var resolveErr error
+	signal.Mint, resolveErr = resolver.Resolve(signal.TokenName)
+	if resolveErr != nil {
+		fmt.Printf("❌ Failed to resolve token: %v\n", resolveErr)
+		return
+	}
 
 	fmt.Println("🚀 EXECUTING BUY")
 	fmt.Printf("Token: %s → %s\n\n", signal.TokenName, signal.Mint[:20]+"...")
