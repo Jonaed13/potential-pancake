@@ -332,7 +332,18 @@ func initComponents() (
 	if wallet != nil {
 		// Initialize RPC client
 		rpcCfg := cfg.Get().RPC
-		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+
+		// Construct URLs with API keys if present
+		fallbackURL := rpcCfg.FallbackURL
+		if heliusKey := cfg.GetHeliusAPIKey(); heliusKey != "" {
+			if strings.Contains(fallbackURL, "?") {
+				fallbackURL += "&api-key=" + heliusKey
+			} else {
+				fallbackURL += "?api-key=" + heliusKey
+			}
+		}
+
+		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, fallbackURL, cfg.GetShyftAPIKey())
 
 		// Initialize blockhash cache
 		blockhashCache = blockchain.NewBlockhashCache(
