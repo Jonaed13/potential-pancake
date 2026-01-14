@@ -1258,12 +1258,26 @@ func (pp PositionsPane) Render(w, h int) string {
 
 // 5. CONFIG MODAL
 type ConfigModal struct {
-	Cfg *config.Manager
-	Fields []string
-	Selected int
+	Cfg          *config.Manager
+	Fields       []string
+	Descriptions []string
+	Selected     int
 }
+
 func NewConfigModal(cfg *config.Manager) ConfigModal {
-	return ConfigModal{Cfg: cfg, Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"}, Selected: 0}
+	return ConfigModal{
+		Cfg:    cfg,
+		Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"},
+		Descriptions: []string{
+			"Buy when token is up by this % (e.g. 50%)",
+			"Sell when price reaches this multiple (e.g. 2.0x)",
+			"Max % of wallet balance to use per trade",
+			"Max number of concurrent open positions",
+			"SOL fee paid to miners (0.003+ rec.)",
+			"Master switch for automated trading",
+		},
+		Selected: 0,
+	}
 }
 func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	switch {
@@ -1306,6 +1320,13 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add description if available
+	if cm.Selected < len(cm.Descriptions) {
+		desc := lipgloss.NewStyle().Foreground(ColorActive).Italic(true).Render(cm.Descriptions[cm.Selected])
+		s += "\n" + desc + "\n"
+	}
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
