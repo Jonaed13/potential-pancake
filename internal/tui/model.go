@@ -1260,10 +1260,23 @@ func (pp PositionsPane) Render(w, h int) string {
 type ConfigModal struct {
 	Cfg *config.Manager
 	Fields []string
+	Descriptions []string
 	Selected int
 }
 func NewConfigModal(cfg *config.Manager) ConfigModal {
-	return ConfigModal{Cfg: cfg, Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"}, Selected: 0}
+	return ConfigModal{
+		Cfg: cfg,
+		Fields: []string{"MinEntry", "TakeProfit", "MaxAlloc", "MaxPos", "PrioFee", "AutoTrade"},
+		Descriptions: []string{
+			"Min signal strength to auto-buy (e.g. 50%)",
+			"Sell multiplier target (e.g. 2.0x = 100% gain)",
+			"Percentage of wallet balance to use per trade",
+			"Maximum number of concurrent open positions",
+			"Additional SOL fee for faster transaction processing",
+			"Master switch to enable or disable automated buying",
+		},
+		Selected: 0,
+	}
 }
 func (cm ConfigModal) Update(msg tea.KeyMsg, m *Model) (tea.Model, tea.Cmd) {
 	switch {
@@ -1306,6 +1319,15 @@ func (cm ConfigModal) Render(w, h int) string {
 		if i == cm.Selected { cursor = "> " }
 		s += cursor + r + "\n"
 	}
+
+	// Add helper text
+	if cm.Selected < len(cm.Descriptions) {
+		desc := cm.Descriptions[cm.Selected]
+		// Using the active color for the icon, but standard text for the description to be subtle
+		s += "\n" + lipgloss.NewStyle().Foreground(ColorActive).Render("ℹ ") +
+			lipgloss.NewStyle().Italic(true).Foreground(ColorText).Render(desc) + "\n"
+	}
+
 	s += "\n[Ent] Save  [Esc] Cancel  [←/→] Adjust"
 	return StyleModal.Render(s)
 }
