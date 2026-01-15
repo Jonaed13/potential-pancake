@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -97,10 +98,20 @@ func (e *ExecutorFast) SetupWebSocket() error {
 		return nil
 	}
 
+	// Inject API Key if missing
+	url := wsCfg.ShyftURL
+	if apiKey := e.cfg.GetShyftAPIKey(); apiKey != "" && !strings.Contains(url, "api_key") {
+		if strings.Contains(url, "?") {
+			url += "&api_key=" + apiKey
+		} else {
+			url += "?api_key=" + apiKey
+		}
+	}
+
 	reconnectDelay := time.Duration(wsCfg.ReconnectDelayMs) * time.Millisecond
 	pingInterval := time.Duration(wsCfg.PingIntervalMs) * time.Millisecond
 
-	e.wsClient = ws.NewClient(wsCfg.ShyftURL, reconnectDelay, pingInterval)
+	e.wsClient = ws.NewClient(url, reconnectDelay, pingInterval)
 	// Note: stopCh is already initialized in NewExecutorFast
 
 	// Set connection callbacks
