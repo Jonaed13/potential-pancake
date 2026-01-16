@@ -79,11 +79,13 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
 type KeyMap struct {
 	Config, Pause, Sell, Logs, Trades, Quit key.Binding
+	Help                                    key.Binding
 	Up, Down, Left, Right, Enter, Escape    key.Binding
 	Tab                                     key.Binding
 	Search, Clear, Export, Theme, Health    key.Binding
@@ -91,6 +93,7 @@ type KeyMap struct {
 }
 var keys = KeyMap{
 	Config: key.NewBinding(key.WithKeys("c")),
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Pause:  key.NewBinding(key.WithKeys("p")),
 	Sell:   key.NewBinding(key.WithKeys("s")),
 	Logs:   key.NewBinding(key.WithKeys("l")),
@@ -125,6 +128,7 @@ type Model struct {
 	
 	// Navigation
 	CurrentScreen   Screen
+	PreviousScreen  Screen // To restore state after modal
 	Width, Height   int
 	ActivePane      int // 0=Dashboard, 1=Signals, 2=Positions, 3=Metrics
 	
@@ -136,6 +140,7 @@ type Model struct {
 	ConfigModal  ConfigModal
 	LogsView     LogsView
 	TradesView   TradesHistoryView
+	HelpView     HelpView
 	
 	// Callbacks
 	OnTogglePause func()
@@ -179,6 +184,7 @@ func NewModel(cfg *config.Manager) Model {
 		Positions:     NewPositionsPane(),
 		LogsView:      NewLogsView(),
 		TradesView:    NewTradesHistoryView(),
+		HelpView:      NewHelpView(),
 		ConfigModal:   NewConfigModal(cfg),
 		CurrentScreen: ScreenDashboard,
 		UIMode:        uiMode,
@@ -312,6 +318,14 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, keys.Help):
+		if m.CurrentScreen != ScreenHelp {
+			m.PreviousScreen = m.CurrentScreen
+			m.CurrentScreen = ScreenHelp
+		} else {
+			m.CurrentScreen = m.PreviousScreen
+		}
+		return m, nil
 	case key.Matches(msg, keys.Tab):
 		m.FocusPane = (m.FocusPane + 1) % 3
 	}
@@ -433,6 +447,8 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.LogsView.Update(msg, m)
 	case ScreenTrades:
 		return m.TradesView.Update(msg, m)
+	case ScreenHelp:
+		return m.HelpView.Update(msg, m)
 	}
 	
 	return m, nil
@@ -472,6 +488,8 @@ func (m Model) View() string {
 		return m.LogsView.Render(m.Width, m.Height)
 	case ScreenTrades:
 		return m.TradesView.Render(m.Width, m.Height)
+	case ScreenHelp:
+		return m.HelpView.Render(m.Width, m.Height)
 	case ScreenConfig:
 		return m.overlay(m.renderDashboard(), m.ConfigModal.Render(m.Width, m.Height))
 	default:
@@ -1146,8 +1164,10 @@ func (f FooterComponent) Render(w int) string {
 		s = RenderHotKey("Esc", "Back")
 	case "config":
 		s = RenderHotKey("Esc", "Cancel") + " " + RenderHotKey("Ent", "Save") + " " + RenderHotKey("Arrows", "Nav")
+	case "help":
+		s = RenderHotKey("Esc", "Back")
 	default:
-		s = RenderHotKey("Q", "uit")
+		s = RenderHotKey("Q", "uit") + " " + RenderHotKey("?", "Help")
 	}
 	return StyleFooter.Width(w).Render(s)
 }
@@ -1345,6 +1365,67 @@ func (thv TradesHistoryView) Render(w, h int) string {
 	header := StyleTableHeader.Width(w).Render("TRADE HISTORY")
 	body := "No trades yet..." 
 	return lipgloss.JoinVertical(lipgloss.Left, header, body)
+}
+
+// 8. HELP VIEW
+type HelpView struct {}
+func NewHelpView() HelpView { return HelpView{} }
+func (hv HelpView) Update(msg tea.KeyMsg, m Model) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Help) {
+		m.CurrentScreen = m.PreviousScreen
+	}
+	return m, nil
+}
+func (hv HelpView) Render(w, h int) string {
+	header := StyleTableHeader.Width(w).Render("KEYBOARD SHORTCUTS")
+
+	// Categories
+	global := []string{
+		RenderHotKey("?", "Help"),
+		RenderHotKey("Q", "Quit"),
+		RenderHotKey("C", "Config"),
+	}
+
+	navigation := []string{
+		RenderHotKey("↑/↓", "Scroll"),
+		RenderHotKey("←/→", "Focus/Nav"),
+		RenderHotKey("Tab", "Cycle Panes"),
+		RenderHotKey("Esc", "Back"),
+	}
+
+	trading := []string{
+		RenderHotKey("P", "Pause/Resume"),
+		RenderHotKey("S", "Sell All (Panic)"),
+		RenderHotKey("F9", "Clear All Data"),
+	}
+
+	views := []string{
+		RenderHotKey("1", "Health"),
+		RenderHotKey("2", "Export CSV"),
+		RenderHotKey("3", "Cycle Theme"),
+		RenderHotKey("L", "Logs"),
+		RenderHotKey("T", "Trades"),
+	}
+
+	// Helper to render a section
+	renderSection := func(title string, items []string) string {
+		s := lipgloss.NewStyle().Foreground(ColorActive).Bold(true).Render(title) + "\n"
+		for _, item := range items {
+			s += "  " + item + "\n"
+		}
+		return s
+	}
+
+	col1 := renderSection("GLOBAL", global) + "\n" + renderSection("TRADING", trading)
+	col2 := renderSection("NAVIGATION", navigation) + "\n" + renderSection("VIEWS", views)
+
+	content := lipgloss.JoinHorizontal(lipgloss.Top,
+		lipgloss.NewStyle().Width(w/2).Render(col1),
+		lipgloss.NewStyle().Width(w/2).Render(col2),
+	)
+
+	box := renderBox("", content, w, h-4)
+	return lipgloss.JoinVertical(lipgloss.Left, header, box)
 }
 
 
@@ -1712,7 +1793,7 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
+	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit [?]Help "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
