@@ -8,11 +8,11 @@ import (
 
 // Animation frame rate
 const (
-	AnimationFPS     = 30
-	AnimationTickMs  = 1000 / AnimationFPS // ~33ms
-	StartupDuration  = 60                  // 60 frames = 2 seconds
-	ButtonFlashDur   = 6                   // 6 frames = 200ms
-	TransitionDur    = 9                   // 9 frames = 300ms
+	AnimationFPS    = 30
+	AnimationTickMs = 1000 / AnimationFPS // ~33ms
+	StartupDuration = 60                  // 60 frames = 2 seconds
+	ButtonFlashDur  = 6                   // 6 frames = 200ms
+	TransitionDur   = 9                   // 9 frames = 300ms
 )
 
 // AnimationType identifies what animation is playing
@@ -40,7 +40,7 @@ type AnimationState struct {
 	Button     Animation
 	Transition Animation
 	StartTime  time.Time
-	
+
 	// Continuous animation counter (never stops in Mode 3)
 	GlobalFrame int
 }
@@ -62,30 +62,30 @@ func NewAnimationState() AnimationState {
 func (a *AnimationState) Tick() bool {
 	// Always increment global frame for continuous animations
 	a.GlobalFrame++
-	
+
 	anyActive := true // Always active in Mode 3 for continuous animations
-	
+
 	if a.Startup.Active {
 		a.Startup.Frame++
 		if a.Startup.Frame >= a.Startup.MaxFrames {
 			a.Startup.Active = false
 		}
 	}
-	
+
 	if a.Button.Active {
 		a.Button.Frame++
 		if a.Button.Frame >= a.Button.MaxFrames {
 			a.Button.Active = false
 		}
 	}
-	
+
 	if a.Transition.Active {
 		a.Transition.Frame++
 		if a.Transition.Frame >= a.Transition.MaxFrames {
 			a.Transition.Active = false
 		}
 	}
-	
+
 	return anyActive
 }
 
@@ -178,9 +178,11 @@ func TypewriterString(s string, progress float64) string {
 // PulseValue returns a value that oscillates between min and max
 // period is in frames (e.g., 30 = 1 second at 30 FPS)
 func (a *AnimationState) PulseValue(min, max float64, period int) float64 {
-	if period <= 0 { period = 30 }
+	if period <= 0 {
+		period = 30
+	}
 	// Sine wave oscillation
-	phase := float64(a.GlobalFrame % period) / float64(period)
+	phase := float64(a.GlobalFrame%period) / float64(period)
 	// sin returns -1 to 1, map to 0 to 1
 	factor := (sin(phase*2*3.14159) + 1) / 2
 	return min + (max-min)*factor
@@ -190,7 +192,9 @@ func (a *AnimationState) PulseValue(min, max float64, period int) float64 {
 func sin(x float64) float64 {
 	// Taylor series approximation for sin
 	x = x - float64(int(x/(2*3.14159)))*2*3.14159
-	if x > 3.14159 { x -= 2*3.14159 }
+	if x > 3.14159 {
+		x -= 2 * 3.14159
+	}
 	x3 := x * x * x
 	x5 := x3 * x * x
 	return x - x3/6 + x5/120
@@ -198,13 +202,17 @@ func sin(x float64) float64 {
 
 // WaveOffset returns shifting offset for wave animation
 func (a *AnimationState) WaveOffset(period int) int {
-	if period <= 0 { period = 15 }
+	if period <= 0 {
+		period = 15
+	}
 	return a.GlobalFrame / 2 % period
 }
 
 // CycleColor returns alternating color based on frame
 func (a *AnimationState) CycleIndex(numColors, period int) int {
-	if period <= 0 { period = 90 }
+	if period <= 0 {
+		period = 90
+	}
 	return (a.GlobalFrame / period) % numColors
 }
 
@@ -217,4 +225,3 @@ func (a *AnimationState) GetGaugePulse() float64 {
 func (a *AnimationState) GetBorderColorIndex() int {
 	return a.CycleIndex(3, 45) // 3 colors, change every 1.5s
 }
-
