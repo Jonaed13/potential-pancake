@@ -75,7 +75,7 @@ func main() {
 		Timestamp: time.Now().Unix(),
 		MsgID:     1,
 	}
-	signal.Mint = resolver.Resolve(signal.TokenName)
+	signal.Mint, _ = resolver.Resolve(signal.TokenName)
 
 	fmt.Println("🚀 EXECUTING BUY")
 	fmt.Printf("Token: %s → %s\n\n", signal.TokenName, signal.Mint[:20]+"...")
@@ -87,7 +87,7 @@ func main() {
 
 	fmt.Println("")
 	fmt.Printf("⚡ EXECUTION TIME: %dms\n", elapsed.Milliseconds())
-	
+
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n", err)
 		return

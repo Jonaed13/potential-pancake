@@ -875,7 +875,7 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 						Str("token", pos.TokenName).
 						Msg("position has 0 tokens - marking as sold/failed")
 					pos.SetStatsFromSignal(0, "X") // safe update
-					pos.PnLPercent = -100 // Show as total loss
+					pos.PnLPercent = -100          // Show as total loss
 					pos.SetEntryTxSig("FAILED")
 					// Keep it visible for FailedPositionTTL then remove
 					if time.Since(pos.EntryTime) > FailedPositionTTL {

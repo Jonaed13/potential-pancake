@@ -14,10 +14,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"solana-pump-bot/internal/analytics"
 	"solana-pump-bot/internal/blockchain"
 	"solana-pump-bot/internal/config"
 	"solana-pump-bot/internal/jupiter"
-	"solana-pump-bot/internal/analytics"
 	signalPkg "solana-pump-bot/internal/signal"
 	"solana-pump-bot/internal/storage"
 	"solana-pump-bot/internal/token"
@@ -42,12 +42,12 @@ func runHeadless() {
 
 	// Initialize all components
 	cfg, tokenResolver, signalChan, server, executor, balanceTracker, blockhashCache := initComponents()
-	
+
 	// Setup WebSocket for real-time updates
 	if err := executor.SetupWebSocket(); err != nil {
 		log.Warn().Err(err).Msg("WebSocket setup failed (will use polling)")
 	}
-	
+
 	// Start monitor
 	executor.StartMonitoring(context.Background())
 
@@ -110,7 +110,7 @@ func runWithTUI() {
 		fmt.Fprintf(os.Stderr, "Warning: Could not open log file: %v\n", err)
 		logFile = nil
 	}
-	
+
 	if logFile != nil {
 		log.Logger = zerolog.New(logFile).With().Timestamp().Logger()
 		zerolog.SetGlobalLevel(zerolog.InfoLevel) // Only info and above in TUI mode
@@ -187,10 +187,10 @@ func runWithTUI() {
 					log.Warn().Err(err).Str("token", sig.TokenName).Msg("failed to resolve mint for signal")
 				}
 			}
-			
+
 			// Send to TUI
 			tui.SendSignal(p, sig)
-			
+
 			// Execute trade (FAST - no blocking checks)
 			if executor != nil {
 				// FIX: Run async to not block signal ingestion
@@ -213,7 +213,7 @@ func runWithTUI() {
 
 		// Seek to end initially to avoid spamming old logs
 		file.Seek(0, 2)
-		
+
 		reader := bufio.NewReader(file)
 		for {
 			line, err := reader.ReadString('\n')
@@ -359,14 +359,14 @@ func initComponents() (
 		// Initialize balance tracker
 		balanceTracker = blockchain.NewBalanceTracker(wallet, rpc)
 		balanceTracker.Refresh(context.Background())
-		
+
 		// FIX: Show wallet address and balance at startup
 		balanceSOL := balanceTracker.BalanceSOL()
 		log.Info().
 			Str("address", wallet.Address()).
 			Float64("balance", balanceSOL).
 			Msg("💰 WALLET STATUS")
-		
+
 		// FIX: LOUD WARNING if balance is 0
 		if balanceSOL == 0 {
 			log.Error().

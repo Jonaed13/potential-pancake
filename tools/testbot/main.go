@@ -22,7 +22,7 @@ const testPrivateKey = "4wBqpZM9xaSheZzJSMawUHDgZ7miWfSsxmfVF5BJWybHxPNzLwBY3k1B
 
 func main() {
 	setupLogger()
-	
+
 	fmt.Println("🧪 TEST BOT - 1:1 Copy with Test Key")
 	fmt.Println("=====================================")
 	fmt.Println("This is an EXACT copy of your bot logic")
@@ -102,7 +102,7 @@ func main() {
 	}
 
 	// Resolve token (exact same as real bot)
-	testSignal.Mint = resolver.Resolve(testSignal.TokenName)
+	testSignal.Mint, _ = resolver.Resolve(testSignal.TokenName)
 	fmt.Printf("Token: %s\n", testSignal.TokenName)
 	fmt.Printf("Mint: %s\n", testSignal.Mint)
 	fmt.Printf("Signal: %.1f%s (Type: %s)\n\n", testSignal.Value, testSignal.Unit, testSignal.Type)

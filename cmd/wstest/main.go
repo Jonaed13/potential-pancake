@@ -38,7 +38,7 @@ func main() {
 	client.SetCallbacks(
 		func() {
 			log.Info().Msg("✅ WebSocket CONNECTED!")
-			
+
 			// Test: Subscribe to SOL mint account (just to verify subscription works)
 			solMint := "So11111111111111111111111111111111111111112"
 			subID, err := client.AccountSubscribe(solMint, func(data json.RawMessage) {

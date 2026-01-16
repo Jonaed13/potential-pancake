@@ -82,7 +82,7 @@ func main() {
 
 	// Step 6: Get Jupiter quote + swap TX
 	tradeStart := time.Now()
-	
+
 	step6Start := time.Now()
 	amountLamports := uint64(10_000_000) // 0.01 SOL test amount
 	swapTx, err := jupiterClient.GetSwapTransaction(ctx, jupiter.SOLMint, testMint, wallet.Address(), amountLamports)
@@ -146,7 +146,7 @@ func main() {
 		rpcMs := timings["9_rpc_latency"].Milliseconds()
 		signMs := timings["8_tx_sign"].Milliseconds()
 		blockhashMs := timings["7_blockhash_get"].Milliseconds()
-		
+
 		estimatedTradeMs := jupiterMs + signMs + rpcMs + blockhashMs
 		fmt.Printf("  Estimated real trade latency: %dms\n", estimatedTradeMs)
 		fmt.Printf("  Jupiter API: %dms\n", jupiterMs)

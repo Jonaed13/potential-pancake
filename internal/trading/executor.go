@@ -3,6 +3,7 @@ package trading
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -16,15 +17,15 @@ import (
 
 // Executor handles trade execution
 type Executor struct {
-	cfg            *config.Manager
-	wallet         *blockchain.Wallet
-	rpc            *blockchain.RPCClient
-	jupiter        *jupiter.Client
-	txBuilder      *blockchain.TransactionBuilder
-	positions      *PositionTracker
-	balance        *blockchain.BalanceTracker
-	db             *storage.DB
-	mu             sync.Mutex
+	cfg       *config.Manager
+	wallet    *blockchain.Wallet
+	rpc       *blockchain.RPCClient
+	jupiter   *jupiter.Client
+	txBuilder *blockchain.TransactionBuilder
+	positions *PositionTracker
+	balance   *blockchain.BalanceTracker
+	db        *storage.DB
+	mu        sync.Mutex
 
 	// Callbacks
 	onTradeExecuted func(signal *signalPkg.Signal, txSig string, success bool)
@@ -323,41 +324,46 @@ func (e *Executor) StartMonitoring(ctx context.Context) {
 
 func (e *Executor) monitorPositions(ctx context.Context) {
 	positions := e.positions.GetAll()
-	if len(positions) == 0 { return }
-	
+	if len(positions) == 0 {
+		return
+	}
+
 	cfg := e.cfg.GetTrading()
-	
+
 	for _, pos := range positions {
 		// Get current token balance
 		balance, err := e.getTokenBalance(ctx, pos.Mint)
-		if err != nil || balance == 0 { continue }
-		
+		if err != nil || balance == 0 {
+			continue
+		}
+
 		// Get Quote for ALL tokens -> SOL
 		quote, err := e.jupiter.GetQuote(ctx, pos.Mint, jupiter.SOLMint, balance)
-		if err != nil { continue }
-		
-		outAmount := 0.0
-		fmt.Sscanf(quote.OutAmount, "%f", &outAmount)
+		if err != nil {
+			continue
+		}
+
+		outAmount, _ := strconv.ParseFloat(quote.OutAmount, 64)
 		currentValSOL := outAmount / 1e9
-		
+
 		// Update Position Stats
 		// pos.CurrentValue = currentValSOL
 		// pos.PnLSol = currentValSOL - pos.Size
 		// if pos.Size > 0 {
 		// 	pos.PnLPercent = ((currentValSOL / pos.Size) - 1.0) * 100
 		// }
-		
+
 		multiple := pos.UpdateStats(currentValSOL, balance)
 
 		// Logic: 2X Detection
 		// multiple := 0.0
 		// if pos.Size > 0 { multiple = currentValSOL / pos.Size }
-		
+
 		if multiple >= 2.0 && !pos.IsReached2X() {
 			pos.SetReached2X(true)
 			log.Info().Str("token", pos.TokenName).Msg("reached 2X! marked as win")
 		}
-		
+
 		// Logic: Partial Profit-Taking
 		if cfg.PartialProfitPercent > 0 && cfg.PartialProfitMultiple > 1.0 {
 			if multiple >= cfg.PartialProfitMultiple && !pos.IsPartialSold() {
@@ -365,7 +371,7 @@ func (e *Executor) monitorPositions(ctx context.Context) {
 				e.executePartialSell(ctx, pos, cfg.PartialProfitPercent)
 			}
 		}
-		
+
 		// Logic: Time-Based Exit
 		if cfg.MaxHoldMinutes > 0 {
 			if time.Since(pos.EntryTime) > time.Duration(cfg.MaxHoldMinutes)*time.Minute {
@@ -386,33 +392,37 @@ func (e *Executor) monitorPositions(ctx context.Context) {
 func (e *Executor) executePartialSell(ctx context.Context, pos *Position, percent float64) {
 	// 1. Calculate Amount
 	balance, err := e.getTokenBalance(ctx, pos.Mint)
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	sellAmount := uint64(float64(balance) * (percent / 100.0))
-	
+
 	log.Info().Str("token", pos.TokenName).Msgf("selling %.0f%% of position...", percent)
-	
+
 	// 2. Perform Swap (Token -> SOL)
 	swapTx, err := e.jupiter.GetSwapTransaction(ctx, pos.Mint, jupiter.SOLMint, e.wallet.Address(), sellAmount)
 	if err != nil {
 		log.Error().Err(err).Msg("failed partial swap tx")
 		return
 	}
-	
+
 	signedTx, err := e.txBuilder.SignSerializedTransaction(swapTx)
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	txSig, err := e.rpc.SendTransaction(ctx, signedTx, true)
 	if err != nil {
 		log.Error().Err(err).Msg("failed partial sell send")
 		return
 	}
-	
+
 	// 3. Update Position State
 	pos.SetPartialSold(true)
 	log.Info().Str("txSig", txSig).Msg("PARTIAL SELL executed ✓")
-	
-	// Note: We don't remove position, just mark sold. 
+
+	// Note: We don't remove position, just mark sold.
 	// Adjusting Size (Cost Basis) is complex, usually we just reduce it?
 	// For simplicity, we keep original Size to track overall ROI against initial investment.
 }
@@ -441,14 +451,14 @@ func (e *Executor) ForceClose(ctx context.Context, mint string) error {
 func (e *Executor) getTokenBalance(ctx context.Context, mint string) (uint64, error) {
 	// This would typically use getTokenAccountsByOwner or similar RPC call
 	// For now, we'll use a simplified approach that may require enhancement
-	// 
+	//
 	// In a full implementation, you would:
 	// 1. Derive the Associated Token Account (ATA) address
 	// 2. Call getTokenAccountBalance on that address
 	//
 	// For Jupiter swaps, often the actual balance doesn't need to be exact
 	// as Jupiter will use all available balance when you specify a high amount
-	
+
 	// Return a max value which Jupiter will interpret as "sell all"
 	// Jupiter API handles partial fills appropriately
 	return 0xFFFFFFFFFFFFFFFF, nil
