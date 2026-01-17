@@ -79,11 +79,13 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
 type KeyMap struct {
 	Config, Pause, Sell, Logs, Trades, Quit key.Binding
+	Help                                    key.Binding
 	Up, Down, Left, Right, Enter, Escape    key.Binding
 	Tab                                     key.Binding
 	Search, Clear, Export, Theme, Health    key.Binding
@@ -96,6 +98,7 @@ var keys = KeyMap{
 	Logs:   key.NewBinding(key.WithKeys("l")),
 	Trades: key.NewBinding(key.WithKeys("t")),
 	Quit:   key.NewBinding(key.WithKeys("q", "ctrl+c")),
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Up:     key.NewBinding(key.WithKeys("up", "k")),
 	Down:   key.NewBinding(key.WithKeys("down", "j")),
 	Left:   key.NewBinding(key.WithKeys("left", "h")),
@@ -302,10 +305,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// 1. Config Modal Overlay Override
+	// 1. Modal Overlay Overrides
 	if m.CurrentScreen == ScreenConfig {
 		// Pass pointer to model for adjustment
 		return m.ConfigModal.Update(msg, &m)
+	}
+	if m.CurrentScreen == ScreenHelp {
+		if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Help) || key.Matches(msg, keys.Enter) {
+			m.CurrentScreen = ScreenDashboard
+		}
+		return m, nil
 	}
 
 	// 2. Global Hotkeys (visible on Dashboard)
@@ -322,6 +331,8 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.Config):
 			m.CurrentScreen = ScreenConfig
+		case key.Matches(msg, keys.Help):
+			m.CurrentScreen = ScreenHelp
 		case key.Matches(msg, keys.Pause):
 			m.Running = !m.Running
 			if m.OnTogglePause != nil { m.OnTogglePause() }
@@ -474,6 +485,8 @@ func (m Model) View() string {
 		return m.TradesView.Render(m.Width, m.Height)
 	case ScreenConfig:
 		return m.overlay(m.renderDashboard(), m.ConfigModal.Render(m.Width, m.Height))
+	case ScreenHelp:
+		return m.overlay(m.renderDashboard(), m.renderHelp())
 	default:
 		// ActivePane full-screen views
 		switch m.ActivePane {
@@ -1704,6 +1717,21 @@ func (m Model) renderNeonDashboard() string {
 	return lipgloss.NewStyle().Background(bg).Render(ui)
 }
 
+func (m Model) renderHelp() string {
+	s := "** KEYBOARD SHORTCUTS **\n\n"
+	s += "  [C]     Config Menu\n"
+	s += "  [P]     Pause/Resume\n"
+	s += "  [S]     Sell All\n"
+	s += "  [L]     Logs View\n"
+	s += "  [T]     Trade History\n"
+	s += "  [?]     Show this Help\n"
+	s += "  [Q]     Quit\n"
+	s += "  [Tab]   Switch Focus Pane\n"
+	s += "  [Arr]   Navigate/Scroll\n"
+	s += "\n[Esc] Close"
+	return StyleModal.Render(s)
+}
+
 func (m Model) renderNeonFooter(w int) string {
 	// Status
 	status := fmt.Sprintf(" ⏱ %s │ 💰 %+.2f%%", 
@@ -1712,7 +1740,7 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
+	controls := "[?]Help [TAB/←→]Focus [↑↓]Scroll [Q]uit "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
