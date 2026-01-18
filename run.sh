@@ -61,6 +61,12 @@ if [ ! -f .env ]; then
     echo -e "${BLUE}Enter Telegram channel link (e.g. https://t.me/solearlytrending):${NC}"
     read -r TG_CHANNEL
     
+    echo -e "${BLUE}Enter Shyft API Key (optional, press Enter to skip):${NC}"
+    read -r SHYFT_KEY
+
+    echo -e "${BLUE}Enter Helius API Key (optional, press Enter to skip):${NC}"
+    read -r HELIUS_KEY
+
     cat > .env << EOF
 # Telegram Credentials
 TG_API_ID=
@@ -72,7 +78,8 @@ TG_CHANNEL_LINK=$TG_CHANNEL
 WALLET_PRIVATE_KEY=
 
 # API Keys
-SHYFT_API_KEY=
+SHYFT_API_KEY=$SHYFT_KEY
+HELIUS_API_KEY=$HELIUS_KEY
 JUPITER_API_KEYS=
 
 # Debug mode
