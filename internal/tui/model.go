@@ -79,6 +79,7 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
@@ -86,8 +87,8 @@ type KeyMap struct {
 	Config, Pause, Sell, Logs, Trades, Quit key.Binding
 	Up, Down, Left, Right, Enter, Escape    key.Binding
 	Tab                                     key.Binding
-	Search, Clear, Export, Theme, Health    key.Binding
-	Tab1, Tab2, Tab3, Tab0                  key.Binding
+	Search, Clear, Export, Theme, Health, Help key.Binding
+	Tab1, Tab2, Tab3, Tab0                     key.Binding
 }
 var keys = KeyMap{
 	Config: key.NewBinding(key.WithKeys("c")),
@@ -108,6 +109,7 @@ var keys = KeyMap{
 	Export: key.NewBinding(key.WithKeys("e")),
 	Theme:  key.NewBinding(key.WithKeys("t")),
 	Health: key.NewBinding(key.WithKeys("5")),
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Tab1:   key.NewBinding(key.WithKeys("1")),
 	Tab2:   key.NewBinding(key.WithKeys("2")),
 	Tab3:   key.NewBinding(key.WithKeys("3")),
@@ -125,6 +127,7 @@ type Model struct {
 	
 	// Navigation
 	CurrentScreen   Screen
+	PreviousScreen  Screen
 	Width, Height   int
 	ActivePane      int // 0=Dashboard, 1=Signals, 2=Positions, 3=Metrics
 	
@@ -181,6 +184,7 @@ func NewModel(cfg *config.Manager) Model {
 		TradesView:    NewTradesHistoryView(),
 		ConfigModal:   NewConfigModal(cfg),
 		CurrentScreen: ScreenDashboard,
+		PreviousScreen: ScreenDashboard,
 		UIMode:        uiMode,
 		Anim:          animState,
 		FocusPane:     1, // Default focus center
@@ -312,6 +316,14 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, keys.Help):
+		if m.CurrentScreen == ScreenHelp {
+			m.CurrentScreen = m.PreviousScreen
+		} else {
+			m.PreviousScreen = m.CurrentScreen
+			m.CurrentScreen = ScreenHelp
+		}
+		return m, nil
 	case key.Matches(msg, keys.Tab):
 		m.FocusPane = (m.FocusPane + 1) % 3
 	}
@@ -433,6 +445,10 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.LogsView.Update(msg, m)
 	case ScreenTrades:
 		return m.TradesView.Update(msg, m)
+	case ScreenHelp:
+		if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Enter) {
+			m.CurrentScreen = m.PreviousScreen
+		}
 	}
 	
 	return m, nil
@@ -464,10 +480,41 @@ func (m *Model) adjustConfig(delta float64) {
 
 // --- VIEW RENDERING ---
 
+func (m Model) renderHelp() string {
+	title := lipgloss.NewStyle().Foreground(ColorActive).Bold(true).Render("KEYBOARD SHORTCUTS")
+
+	groups := []struct{
+		Name string
+		Keys []string
+	}{
+		{"Navigation", []string{"↑/↓", "Scroll Lists", "←/→", "Focus / Scroll", "Tab", "Cycle Focus Pane"}},
+		{"Actions", []string{"P", "Pause/Resume", "S", "Sell All (Panic)", "F9", "Clear Data", "E", "Export CSV"}},
+		{"Views", []string{"1", "Health", "2", "Positions", "3", "Metrics/Theme", "C", "Config", "L", "Logs", "T", "Trades"}},
+		{"Global", []string{"?", "Toggle Help", "Q", "Quit"}},
+	}
+
+	var content string
+	for _, g := range groups {
+		content += lipgloss.NewStyle().Foreground(ColorAccentPurple).Bold(true).Render(g.Name) + "\n"
+		for i := 0; i < len(g.Keys); i+=2 {
+			k := g.Keys[i]
+			d := g.Keys[i+1]
+			content += fmt.Sprintf("  %-10s %s\n", k, d)
+		}
+		content += "\n"
+	}
+
+	content += "[Esc] Close"
+
+	return StyleModal.Width(50).Render(lipgloss.JoinVertical(lipgloss.Center, title, "\n", content))
+}
+
 func (m Model) View() string {
 	if m.Width == 0 { return "Loading..." }
 	
 	switch m.CurrentScreen {
+	case ScreenHelp:
+		return m.overlay(m.renderDashboard(), m.renderHelp())
 	case ScreenLogs:
 		return m.LogsView.Render(m.Width, m.Height)
 	case ScreenTrades:
@@ -695,7 +742,7 @@ func (m Model) renderClassicDashboard() string {
 
 	// 4. CLASSIC FOOTER (text hotkeys)
 	statusLine := fmt.Sprintf("Uptime: %s | PnL: %+.2f%%", time.Since(m.StartTime).Truncate(time.Second), m.Positions.TotalPnLPercent)
-	hotkeys := "[1]Signals [2]Positions [3]Metrics [5]Health [C]fg [P]ause [S]ell [F9]Clear [Q]uit"
+	hotkeys := "[1]Signals [2]Positions [3]Metrics [5]Health [C]fg [P]ause [S]ell [F9]Clear [?]Help [Q]uit"
 	footerBox := renderBox("Footer", lipgloss.NewStyle().Foreground(ColorText).Render(statusLine+"\n"+hotkeys), m.Width, 4)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, tabsBox, graphsBox, listsRow, footerBox)
@@ -1139,7 +1186,7 @@ func (f FooterComponent) Render(w int) string {
 	var s string
 	switch f.Screen {
 	case "dashboard":
-		s = RenderHotKey("C", "fg") + " " + RenderHotKey("P", "ause") + " " + RenderHotKey("S", "ell") + " " + RenderHotKey("L", "og") + " " + RenderHotKey("T", "rades") + " " + RenderHotKey("F9", "Clr") + " " + RenderHotKey("Q", "uit")
+		s = RenderHotKey("C", "fg") + " " + RenderHotKey("P", "ause") + " " + RenderHotKey("S", "ell") + " " + RenderHotKey("L", "og") + " " + RenderHotKey("T", "rades") + " " + RenderHotKey("F9", "Clr") + " " + RenderHotKey("?", "Help") + " " + RenderHotKey("Q", "uit")
 	case "logs":
 		s = RenderHotKey("Esc", "Back") + " " + RenderHotKey("Up/Dn", "Scroll")
 	case "trades":
@@ -1712,7 +1759,7 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
+	controls := "[TAB/←→]Focus [↑↓]Scroll [?]Help [Q]uit "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
