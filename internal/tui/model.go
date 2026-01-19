@@ -79,11 +79,13 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
 type KeyMap struct {
 	Config, Pause, Sell, Logs, Trades, Quit key.Binding
+	Help                                    key.Binding
 	Up, Down, Left, Right, Enter, Escape    key.Binding
 	Tab                                     key.Binding
 	Search, Clear, Export, Theme, Health    key.Binding
@@ -92,6 +94,7 @@ type KeyMap struct {
 var keys = KeyMap{
 	Config: key.NewBinding(key.WithKeys("c")),
 	Pause:  key.NewBinding(key.WithKeys("p")),
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Sell:   key.NewBinding(key.WithKeys("s")),
 	Logs:   key.NewBinding(key.WithKeys("l")),
 	Trades: key.NewBinding(key.WithKeys("t")),
@@ -310,6 +313,13 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 2. Global Hotkeys (visible on Dashboard)
 	switch {
+	case key.Matches(msg, keys.Help):
+		if m.CurrentScreen == ScreenHelp {
+			m.CurrentScreen = ScreenDashboard
+		} else {
+			m.CurrentScreen = ScreenHelp
+		}
+		return m, nil
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.Tab):
@@ -433,6 +443,10 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.LogsView.Update(msg, m)
 	case ScreenTrades:
 		return m.TradesView.Update(msg, m)
+	case ScreenHelp:
+		if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Enter) || key.Matches(msg, keys.Help) {
+			m.CurrentScreen = ScreenDashboard
+		}
 	}
 	
 	return m, nil
@@ -474,6 +488,8 @@ func (m Model) View() string {
 		return m.TradesView.Render(m.Width, m.Height)
 	case ScreenConfig:
 		return m.overlay(m.renderDashboard(), m.ConfigModal.Render(m.Width, m.Height))
+	case ScreenHelp:
+		return m.overlay(m.renderDashboard(), m.renderHelp())
 	default:
 		// ActivePane full-screen views
 		switch m.ActivePane {
@@ -633,6 +649,37 @@ func (m Model) renderDashboard() string {
 	
 	// Apply Full Page Background
 	return StylePage.Render(content)
+}
+
+func (m Model) renderHelp() string {
+	helpEntries := []struct{ Key, Desc string }{
+		{"?", "Toggle Help"},
+		{"c", "Open Config"},
+		{"p", "Pause/Resume"},
+		{"s", "Sell All"},
+		{"l", "View Logs"},
+		{"t", "Trade History"},
+		{"F9", "Clear Data"},
+		{"Tab", "Switch Pane"},
+		{"↑/↓", "Scroll List"},
+		{"←/→", "Focus Pane"},
+		{"1-4", "Quick Actions"},
+		{"Esc", "Back/Cancel"},
+		{"q", "Quit"},
+	}
+
+	var content string
+	content += lipgloss.NewStyle().Foreground(ColorActive).Bold(true).Render("KEYBOARD SHORTCUTS") + "\n\n"
+
+	for _, k := range helpEntries {
+		keyText := StyleKey.Render(fmt.Sprintf("%-6s", k.Key))
+		descText := lipgloss.NewStyle().Foreground(ColorText).Render(k.Desc)
+		content += fmt.Sprintf("%s %s\n", keyText, descText)
+	}
+
+	content += "\n" + lipgloss.NewStyle().Foreground(ColorGray).Render("Press [Esc] to close")
+
+	return StyleModal.Render(content)
 }
 
 // renderClassicDashboard - Original dashboard with text hotkeys (UI Mode 1)
@@ -1139,7 +1186,7 @@ func (f FooterComponent) Render(w int) string {
 	var s string
 	switch f.Screen {
 	case "dashboard":
-		s = RenderHotKey("C", "fg") + " " + RenderHotKey("P", "ause") + " " + RenderHotKey("S", "ell") + " " + RenderHotKey("L", "og") + " " + RenderHotKey("T", "rades") + " " + RenderHotKey("F9", "Clr") + " " + RenderHotKey("Q", "uit")
+		s = RenderHotKey("C", "fg") + " " + RenderHotKey("P", "ause") + " " + RenderHotKey("S", "ell") + " " + RenderHotKey("L", "og") + " " + RenderHotKey("T", "rades") + " " + RenderHotKey("F9", "Clr") + " " + RenderHotKey("?", "Help") + " " + RenderHotKey("Q", "uit")
 	case "logs":
 		s = RenderHotKey("Esc", "Back") + " " + RenderHotKey("Up/Dn", "Scroll")
 	case "trades":
@@ -1712,7 +1759,7 @@ func (m Model) renderNeonFooter(w int) string {
 	)
 	
 	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
+	controls := "[TAB/←→]Focus [↑↓]Scroll [?]Help [Q]uit "
 	
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
