@@ -6,3 +6,4 @@ telegram/venv/
 telegram/__pycache__/
 *.session
 *.session-journal
+bot
