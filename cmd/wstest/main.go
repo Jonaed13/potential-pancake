@@ -26,11 +26,12 @@ func main() {
 	time.Sleep(500 * time.Millisecond)
 
 	wsCfg := cfg.Get().WebSocket
-	log.Info().Str("url", wsCfg.ShyftURL[:40]+"...").Msg("connecting to Shyft WebSocket")
+	url := cfg.GetShyftWSURL()
+	log.Info().Str("url", url[:40]+"...").Msg("connecting to Shyft WebSocket")
 
 	// Create WebSocket client
 	client := ws.NewClient(
-		wsCfg.ShyftURL,
+		url,
 		time.Duration(wsCfg.ReconnectDelayMs)*time.Millisecond,
 		time.Duration(wsCfg.PingIntervalMs)*time.Millisecond,
 	)
