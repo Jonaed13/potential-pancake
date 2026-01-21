@@ -92,7 +92,9 @@ func (e *ExecutorFast) SetSimulationMode(enabled bool) {
 // SetupWebSocket initializes WebSocket connection for real-time updates
 func (e *ExecutorFast) SetupWebSocket() error {
 	wsCfg := e.cfg.Get().WebSocket
-	if wsCfg.ShyftURL == "" {
+	// Use GetShyftWSURL() to check if valid URL is constructed (even if base is set)
+	fullURL := e.cfg.GetShyftWSURL()
+	if fullURL == "" || wsCfg.ShyftURL == "" {
 		log.Warn().Msg("WebSocket URL not configured, skipping real-time setup")
 		return nil
 	}
@@ -100,7 +102,7 @@ func (e *ExecutorFast) SetupWebSocket() error {
 	reconnectDelay := time.Duration(wsCfg.ReconnectDelayMs) * time.Millisecond
 	pingInterval := time.Duration(wsCfg.PingIntervalMs) * time.Millisecond
 
-	e.wsClient = ws.NewClient(wsCfg.ShyftURL, reconnectDelay, pingInterval)
+	e.wsClient = ws.NewClient(fullURL, reconnectDelay, pingInterval)
 	// Note: stopCh is already initialized in NewExecutorFast
 
 	// Set connection callbacks
@@ -143,7 +145,7 @@ func (e *ExecutorFast) SetupWebSocket() error {
 		log.Warn().Err(err).Msg("failed to start wallet subscription")
 	}
 
-	urlDisplay := wsCfg.ShyftURL
+	urlDisplay := fullURL
 	if len(urlDisplay) > 40 {
 		urlDisplay = urlDisplay[:40] + "..."
 	}
