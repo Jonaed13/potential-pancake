@@ -389,15 +389,71 @@ type TokenAccountInfo struct {
 	Decimals uint8
 }
 
-// GetTokenAccountsByOwner fetches all token accounts for an owner and mint
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
+// GetTokenAccountsByOwner fetches all token accounts for an owner.
+// If mint is non-empty, filters by mint.
+// If mint is empty, checks both Token Program and Token-2022 Program.
 func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint string) ([]TokenAccountInfo, error) {
+	// If mint is specified, we just query for that mint (which works for both programs implicitly via RPC usually,
+	// but standard getProgramAccounts or getTokenAccountsByOwner requires programId or mint).
+	// When mint is provided, Solana RPC `getTokenAccountsByOwner` handles it if we pass the mint filter.
+	// But wait, `getTokenAccountsByOwner` requires a programId argument in some versions or `mint` in config?
+	// The standard JSON RPC takes (pubkey, config). Config can have mint.
+	// Actually, the method signature is `getTokenAccountsByOwner(pubkey, {mint: ...} | {programId: ...}, ...)`
+	// So we can only filter by ONE.
+
+	if mint != "" {
+		// If mint is provided, we try to find it.
+		// NOTE: We might need to try both programs if the mint could be on either and we don't know.
+		// But usually filtering by mint is sufficient if the RPC supports scanning both?
+		// No, `getTokenAccountsByOwner` requires specifying which program we are querying accounts FOR.
+		// Wait, the params are `(string, object, object)`. The first object MUST contain `mint` OR `programId`.
+		// It does NOT specify the program ID of the token account itself if `mint` is used?
+		// Actually, `getTokenAccountsByOwner` is a method OF a program? No, it's a general RPC.
+		// Documentation says: "Required: One of the following: mint, programId".
+		// But it implies searching ALL token accounts owned by `pubkey`.
+		// However, does it search across ALL Token programs?
+		// Usually it defaults to the original Token Program if not specified?
+		// Actually, looking at docs, you usually have to specify the program ID in the filter if you want all accounts.
+		// If you filter by mint, it should find it regardless of program?
+		// Let's stick to the previous implementation for `mint != ""` case which used `mint` filter.
+		// But for the bulk fetch, we need to be explicit.
+
+		return c.fetchTokenAccounts(ctx, owner, map[string]string{"mint": mint})
+	}
+
+	// If no mint, we want ALL accounts. We must query both programs.
+	// 1. Token Program
+	accounts, err := c.fetchTokenAccounts(ctx, owner, map[string]string{"programId": TokenProgramID})
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Token-2022 Program
+	accounts2022, err := c.fetchTokenAccounts(ctx, owner, map[string]string{"programId": Token2022ProgramID})
+	if err != nil {
+		// Bolt Safety: If we fail to fetch Token-2022 accounts, we must fail the whole batch.
+		// Returning partial data would cause the executor to think Token-2022 positions have 0 balance,
+		// leading to false "sold/failed" state and incorrect PnL (-100%).
+		return nil, fmt.Errorf("failed to fetch Token-2022 accounts: %w", err)
+	}
+	accounts = append(accounts, accounts2022...)
+
+	return accounts, nil
+}
+
+func (c *RPCClient) fetchTokenAccounts(ctx context.Context, owner string, filter map[string]string) ([]TokenAccountInfo, error) {
 	req := RPCRequest{
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  "getTokenAccountsByOwner",
 		Params: []interface{}{
 			owner,
-			map[string]string{"mint": mint},
+			filter,
 			map[string]string{
 				"encoding": "jsonParsed",
 			},
