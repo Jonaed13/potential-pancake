@@ -1,0 +1,3 @@
+## 2024-03-24 - Batching RPC Calls for Token Balances
+**Learning:** Optimizing "N+1" RPC calls (fetching balance per position) into a single batch call (`getTokenAccountsByOwner` with program ID) provides massive performance gains but requires careful handling of Token standards.
+**Action:** When implementing batch token fetching on Solana, ALWAYS query both the legacy Token Program (`Tokenkeg...`) AND the newer Token-2022 Program (`TokenzQ...`). Failing to query both can lead to "ghost" zero balances for Token-2022 assets, causing false liquidations or logic errors. Also, ensure the batch operation fails completely if any sub-query fails to prevent partial state processing.

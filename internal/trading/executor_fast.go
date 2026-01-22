@@ -766,6 +766,28 @@ func (e *ExecutorFast) ResetStats() {
 	e.reached2X = 0
 }
 
+func (e *ExecutorFast) getAllTokenBalances(ctx context.Context) (map[string]uint64, error) {
+	if e.simMode || e.cfg.Get().Trading.SimulationMode {
+		// Return dummy map for all active positions
+		balances := make(map[string]uint64)
+		for _, pos := range e.positions.GetAll() {
+			balances[pos.Mint] = 1_000_000_000
+		}
+		return balances, nil
+	}
+
+	accounts, err := e.rpc.GetTokenAccountsByOwner(ctx, e.wallet.Address(), "")
+	if err != nil {
+		return nil, err
+	}
+
+	balances := make(map[string]uint64)
+	for _, acc := range accounts {
+		balances[acc.Mint] += acc.Amount
+	}
+	return balances, nil
+}
+
 // GetMetrics returns the metrics tracker
 func (e *ExecutorFast) GetMetrics() *Metrics {
 	return e.metrics
@@ -825,6 +847,14 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 
 	cfg := e.cfg.GetTrading()
 
+	// ⚡ Bolt Optimization: Batch token balance fetch
+	// Fetch all token balances in ONE RPC call instead of N calls
+	allBalances, err := e.getAllTokenBalances(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to fetch token balances, skipping monitor cycle")
+		return
+	}
+
 	// ⚡ Bolt Optimization: Parallelize position monitoring
 	// Use a semaphore to limit concurrency and avoid API rate limits
 	const maxConcurrentChecks = 5
@@ -858,14 +888,8 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 				}
 			}
 
-			// Get current token balance
-			balance, err := e.getTokenBalance(ctx, pos.Mint)
-
-			// FIX: Handle 0 balance - mark position as lost/failed
-			if err != nil {
-				log.Debug().Err(err).Str("mint", pos.Mint[:8]+"...").Msg("failed to get balance")
-				return
-			}
+			// Get current token balance from batch result
+			balance := allBalances[pos.Mint]
 
 			if balance == 0 {
 				// Position has 0 tokens - either sold externally or buy failed
@@ -875,7 +899,7 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 						Str("token", pos.TokenName).
 						Msg("position has 0 tokens - marking as sold/failed")
 					pos.SetStatsFromSignal(0, "X") // safe update
-					pos.PnLPercent = -100 // Show as total loss
+					pos.PnLPercent = -100          // Show as total loss
 					pos.SetEntryTxSig("FAILED")
 					// Keep it visible for FailedPositionTTL then remove
 					if time.Since(pos.EntryTime) > FailedPositionTTL {
