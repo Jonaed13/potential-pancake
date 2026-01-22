@@ -79,6 +79,7 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
@@ -88,8 +89,10 @@ type KeyMap struct {
 	Tab                                     key.Binding
 	Search, Clear, Export, Theme, Health    key.Binding
 	Tab1, Tab2, Tab3, Tab0                  key.Binding
+	Help                                    key.Binding
 }
 var keys = KeyMap{
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Config: key.NewBinding(key.WithKeys("c")),
 	Pause:  key.NewBinding(key.WithKeys("p")),
 	Sell:   key.NewBinding(key.WithKeys("s")),
@@ -125,6 +128,7 @@ type Model struct {
 	
 	// Navigation
 	CurrentScreen   Screen
+	PreviousScreen  Screen
 	Width, Height   int
 	ActivePane      int // 0=Dashboard, 1=Signals, 2=Positions, 3=Metrics
 	
@@ -312,12 +316,32 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, keys.Help):
+		if m.CurrentScreen == ScreenHelp {
+			if m.PreviousScreen != "" {
+				m.CurrentScreen = m.PreviousScreen
+			} else {
+				m.CurrentScreen = ScreenDashboard
+			}
+		} else {
+			m.PreviousScreen = m.CurrentScreen
+			m.CurrentScreen = ScreenHelp
+		}
+		return m, nil
 	case key.Matches(msg, keys.Tab):
 		m.FocusPane = (m.FocusPane + 1) % 3
 	}
 
 	// 3. Screen Specific Handling
 	switch m.CurrentScreen {
+	case ScreenHelp:
+		if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Enter) {
+			if m.PreviousScreen != "" {
+				m.CurrentScreen = m.PreviousScreen
+			} else {
+				m.CurrentScreen = ScreenDashboard
+			}
+		}
 	case ScreenDashboard:
 		switch {
 		case key.Matches(msg, keys.Config):
@@ -472,6 +496,8 @@ func (m Model) View() string {
 		return m.LogsView.Render(m.Width, m.Height)
 	case ScreenTrades:
 		return m.TradesView.Render(m.Width, m.Height)
+	case ScreenHelp:
+		return m.overlay(m.renderDashboard(), m.renderHelp())
 	case ScreenConfig:
 		return m.overlay(m.renderDashboard(), m.ConfigModal.Render(m.Width, m.Height))
 	default:
@@ -1345,6 +1371,30 @@ func (thv TradesHistoryView) Render(w, h int) string {
 	header := StyleTableHeader.Width(w).Render("TRADE HISTORY")
 	body := "No trades yet..." 
 	return lipgloss.JoinVertical(lipgloss.Left, header, body)
+}
+
+func (m Model) renderHelp() string {
+	keys := []struct{ k, d string }{
+		{"?", "Toggle Help"},
+		{"C", "Config"},
+		{"P", "Pause/Resume"},
+		{"S", "Sell All"},
+		{"L", "Logs"},
+		{"T", "Trades"},
+		{"E", "Export"},
+		{"/", "Search"},
+		{"F9", "Clear Data"},
+		{"Tab", "Next Pane"},
+		{"1-4", "View Tabs"},
+		{"Q", "Quit"},
+	}
+
+	s := "KEYBOARD SHORTCUTS\n\n"
+	for _, kv := range keys {
+		s += fmt.Sprintf(" %-5s %s\n", kv.k, kv.d)
+	}
+	s += "\n[Esc] Close"
+	return StyleModal.Render(s)
 }
 
 
