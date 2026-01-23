@@ -389,15 +389,65 @@ type TokenAccountInfo struct {
 	Decimals uint8
 }
 
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
+// GetAllTokenAccounts fetches all token accounts for an owner (Legacy + Token-2022)
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	// Query both programs in parallel
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var legacyAccs, token2022Accs []TokenAccountInfo
+	var errLegacy, errToken2022 error
+
+	go func() {
+		defer wg.Done()
+		legacyAccs, errLegacy = c.getTokenAccountsInternal(ctx, owner, map[string]string{"programId": TokenProgramID})
+	}()
+
+	go func() {
+		defer wg.Done()
+		token2022Accs, errToken2022 = c.getTokenAccountsInternal(ctx, owner, map[string]string{"programId": Token2022ProgramID})
+	}()
+
+	wg.Wait()
+
+	// If legacy fails, that's a problem.
+	if errLegacy != nil {
+		return nil, fmt.Errorf("failed to fetch legacy tokens: %w", errLegacy)
+	}
+
+	// If Token-2022 fails, we should also fail the batch to prevent partial state
+	// which could lead to incorrect 0-balance assumptions downstream.
+	if errToken2022 != nil {
+		return nil, fmt.Errorf("failed to fetch Token-2022 tokens: %w", errToken2022)
+	}
+
+	// Combine results
+	accounts := make([]TokenAccountInfo, 0, len(legacyAccs)+len(token2022Accs))
+	accounts = append(accounts, legacyAccs...)
+	accounts = append(accounts, token2022Accs...)
+
+	return accounts, nil
+}
+
 // GetTokenAccountsByOwner fetches all token accounts for an owner and mint
 func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint string) ([]TokenAccountInfo, error) {
+	return c.getTokenAccountsInternal(ctx, owner, map[string]string{"mint": mint})
+}
+
+// getTokenAccountsInternal is the underlying helper
+func (c *RPCClient) getTokenAccountsInternal(ctx context.Context, owner string, filter map[string]string) ([]TokenAccountInfo, error) {
 	req := RPCRequest{
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  "getTokenAccountsByOwner",
 		Params: []interface{}{
 			owner,
-			map[string]string{"mint": mint},
+			filter,
 			map[string]string{
 				"encoding": "jsonParsed",
 			},
