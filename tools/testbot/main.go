@@ -102,7 +102,11 @@ func main() {
 	}
 
 	// Resolve token (exact same as real bot)
-	testSignal.Mint = resolver.Resolve(testSignal.TokenName)
+	mint, err := resolver.Resolve(testSignal.TokenName)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to resolve token")
+	}
+	testSignal.Mint = mint
 	fmt.Printf("Token: %s\n", testSignal.TokenName)
 	fmt.Printf("Mint: %s\n", testSignal.Mint)
 	fmt.Printf("Signal: %.1f%s (Type: %s)\n\n", testSignal.Value, testSignal.Unit, testSignal.Type)
