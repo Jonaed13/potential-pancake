@@ -37,8 +37,7 @@ func main() {
 	fmt.Printf("Wallet: %s\n", wallet.Address())
 
 	// RPC
-	rpcCfg := cfg.Get().RPC
-	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, "")
+	rpc := blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), "")
 
 	// Blockhash cache
 	blockhashCache := blockchain.NewBlockhashCache(rpc, 100*time.Millisecond, 90*time.Second)
@@ -75,7 +74,8 @@ func main() {
 		Timestamp: time.Now().Unix(),
 		MsgID:     1,
 	}
-	signal.Mint = resolver.Resolve(signal.TokenName)
+	mint, _ := resolver.Resolve(signal.TokenName)
+	signal.Mint = mint
 
 	fmt.Println("🚀 EXECUTING BUY")
 	fmt.Printf("Token: %s → %s\n\n", signal.TokenName, signal.Mint[:20]+"...")
