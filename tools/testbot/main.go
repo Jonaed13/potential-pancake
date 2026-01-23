@@ -49,8 +49,7 @@ func main() {
 	fmt.Printf("Test Wallet: %s\n\n", wallet.Address())
 
 	// Initialize RPC (exact same)
-	rpcCfg := cfg.Get().RPC
-	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+	rpc := blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), cfg.GetShyftAPIKey())
 
 	// Initialize blockhash cache (exact same)
 	blockhashCache := blockchain.NewBlockhashCache(
@@ -102,7 +101,14 @@ func main() {
 	}
 
 	// Resolve token (exact same as real bot)
-	testSignal.Mint = resolver.Resolve(testSignal.TokenName)
+	mint, err := resolver.Resolve(testSignal.TokenName)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to resolve mint")
+		// Continue with empty mint or exit? Original code implied it always worked or crashed.
+		// Let's exit to be safe as testbot relies on mint.
+		log.Fatal().Err(err).Msg("failed to resolve mint")
+	}
+	testSignal.Mint = mint
 	fmt.Printf("Token: %s\n", testSignal.TokenName)
 	fmt.Printf("Mint: %s\n", testSignal.Mint)
 	fmt.Printf("Signal: %.1f%s (Type: %s)\n\n", testSignal.Value, testSignal.Unit, testSignal.Type)

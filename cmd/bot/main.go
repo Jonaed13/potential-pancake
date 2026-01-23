@@ -331,8 +331,7 @@ func initComponents() (
 
 	if wallet != nil {
 		// Initialize RPC client
-		rpcCfg := cfg.Get().RPC
-		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+		rpc = blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), cfg.GetShyftAPIKey())
 
 		// Initialize blockhash cache
 		blockhashCache = blockchain.NewBlockhashCache(
