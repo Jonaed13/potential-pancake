@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -38,7 +39,11 @@ func main() {
 
 	// RPC
 	rpcCfg := cfg.Get().RPC
-	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, "")
+	fallbackURL := rpcCfg.FallbackURL
+	if key := cfg.GetHeliusAPIKey(); key != "" {
+		fallbackURL = fmt.Sprintf("%s/?api-key=%s", strings.TrimRight(fallbackURL, "/"), key)
+	}
+	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, fallbackURL, cfg.GetShyftAPIKey())
 
 	// Blockhash cache
 	blockhashCache := blockchain.NewBlockhashCache(rpc, 100*time.Millisecond, 90*time.Second)
@@ -75,14 +80,19 @@ func main() {
 		Timestamp: time.Now().Unix(),
 		MsgID:     1,
 	}
-	signal.Mint = resolver.Resolve(signal.TokenName)
+	mint, err := resolver.Resolve(signal.TokenName)
+	if err != nil {
+		fmt.Printf("❌ Resolve Error: %v\n", err)
+		return
+	}
+	signal.Mint = mint
 
 	fmt.Println("🚀 EXECUTING BUY")
 	fmt.Printf("Token: %s → %s\n\n", signal.TokenName, signal.Mint[:20]+"...")
 
 	// Execute
 	start := time.Now()
-	err := executor.ProcessSignalFast(context.Background(), signal)
+	err = executor.ProcessSignalFast(context.Background(), signal)
 	elapsed := time.Since(start)
 
 	fmt.Println("")

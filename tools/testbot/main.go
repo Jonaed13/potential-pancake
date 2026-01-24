@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -50,7 +51,11 @@ func main() {
 
 	// Initialize RPC (exact same)
 	rpcCfg := cfg.Get().RPC
-	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+	fallbackURL := rpcCfg.FallbackURL
+	if key := cfg.GetHeliusAPIKey(); key != "" {
+		fallbackURL = fmt.Sprintf("%s/?api-key=%s", strings.TrimRight(fallbackURL, "/"), key) // Simplification for test tool
+	}
+	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, fallbackURL, cfg.GetShyftAPIKey())
 
 	// Initialize blockhash cache (exact same)
 	blockhashCache := blockchain.NewBlockhashCache(
@@ -102,7 +107,11 @@ func main() {
 	}
 
 	// Resolve token (exact same as real bot)
-	testSignal.Mint = resolver.Resolve(testSignal.TokenName)
+	mint, err := resolver.Resolve(testSignal.TokenName)
+	if err != nil {
+		log.Warn().Err(err).Str("token", testSignal.TokenName).Msg("failed to resolve mint")
+	}
+	testSignal.Mint = mint
 	fmt.Printf("Token: %s\n", testSignal.TokenName)
 	fmt.Printf("Mint: %s\n", testSignal.Mint)
 	fmt.Printf("Signal: %.1f%s (Type: %s)\n\n", testSignal.Value, testSignal.Unit, testSignal.Type)

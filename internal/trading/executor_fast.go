@@ -100,7 +100,9 @@ func (e *ExecutorFast) SetupWebSocket() error {
 	reconnectDelay := time.Duration(wsCfg.ReconnectDelayMs) * time.Millisecond
 	pingInterval := time.Duration(wsCfg.PingIntervalMs) * time.Millisecond
 
-	e.wsClient = ws.NewClient(wsCfg.ShyftURL, reconnectDelay, pingInterval)
+	// Use GetShyftWSURL to properly inject API key
+	wsURL := e.cfg.GetShyftWSURL()
+	e.wsClient = ws.NewClient(wsURL, reconnectDelay, pingInterval)
 	// Note: stopCh is already initialized in NewExecutorFast
 
 	// Set connection callbacks
@@ -143,7 +145,7 @@ func (e *ExecutorFast) SetupWebSocket() error {
 		log.Warn().Err(err).Msg("failed to start wallet subscription")
 	}
 
-	urlDisplay := wsCfg.ShyftURL
+	urlDisplay := wsURL
 	if len(urlDisplay) > 40 {
 		urlDisplay = urlDisplay[:40] + "..."
 	}
