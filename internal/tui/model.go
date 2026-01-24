@@ -79,17 +79,19 @@ const (
 	ScreenLogs      Screen = "logs"
 	ScreenTrades    Screen = "trades"
 	ScreenMetrics   Screen = "metrics"
+	ScreenHelp      Screen = "help"
 )
 
 // Global Keys
 type KeyMap struct {
 	Config, Pause, Sell, Logs, Trades, Quit key.Binding
 	Up, Down, Left, Right, Enter, Escape    key.Binding
-	Tab                                     key.Binding
+	Tab, Help                               key.Binding
 	Search, Clear, Export, Theme, Health    key.Binding
 	Tab1, Tab2, Tab3, Tab0                  key.Binding
 }
 var keys = KeyMap{
+	Help:   key.NewBinding(key.WithKeys("?")),
 	Config: key.NewBinding(key.WithKeys("c")),
 	Pause:  key.NewBinding(key.WithKeys("p")),
 	Sell:   key.NewBinding(key.WithKeys("s")),
@@ -125,6 +127,7 @@ type Model struct {
 	
 	// Navigation
 	CurrentScreen   Screen
+	PreviousScreen  Screen
 	Width, Height   int
 	ActivePane      int // 0=Dashboard, 1=Signals, 2=Positions, 3=Metrics
 	
@@ -312,12 +315,24 @@ func (m Model) handleGlobalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, keys.Help):
+		if m.CurrentScreen == ScreenHelp {
+			m.CurrentScreen = m.PreviousScreen
+		} else {
+			m.PreviousScreen = m.CurrentScreen
+			m.CurrentScreen = ScreenHelp
+		}
 	case key.Matches(msg, keys.Tab):
 		m.FocusPane = (m.FocusPane + 1) % 3
 	}
 
 	// 3. Screen Specific Handling
 	switch m.CurrentScreen {
+	case ScreenHelp:
+		if key.Matches(msg, keys.Escape) || key.Matches(msg, keys.Enter) {
+			m.CurrentScreen = m.PreviousScreen
+		}
+		return m, nil
 	case ScreenDashboard:
 		switch {
 		case key.Matches(msg, keys.Config):
@@ -464,6 +479,18 @@ func (m *Model) adjustConfig(delta float64) {
 
 // --- VIEW RENDERING ---
 
+func (m Model) renderHelp() string {
+	s := "KEYBOARD SHORTCUTS\n\n" +
+		" [C] Config       [L] Logs\n" +
+		" [P] Pause/Resume [T] Trades\n" +
+		" [S] Sell All     [?] Close Help\n" +
+		" [Q] Quit         [Esc] Back\n\n" +
+		" NAVIGATION\n" +
+		" [Tab] Focus Pane [Arrows] Scroll\n" +
+		" [1-4] Quick Actions"
+	return StyleModal.Render(s)
+}
+
 func (m Model) View() string {
 	if m.Width == 0 { return "Loading..." }
 	
@@ -474,6 +501,8 @@ func (m Model) View() string {
 		return m.TradesView.Render(m.Width, m.Height)
 	case ScreenConfig:
 		return m.overlay(m.renderDashboard(), m.ConfigModal.Render(m.Width, m.Height))
+	case ScreenHelp:
+		return m.overlay(m.renderDashboard(), m.renderHelp())
 	default:
 		// ActivePane full-screen views
 		switch m.ActivePane {
