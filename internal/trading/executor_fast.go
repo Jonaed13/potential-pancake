@@ -653,9 +653,13 @@ func (e *ExecutorFast) isDuplicateSignal(msgID int64) bool {
 func (e *ExecutorFast) markSignalSeen(msgID int64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-
 	e.recentSignals[msgID] = time.Now()
+}
 
+// performCleanup removes old entries from maps to prevent memory leaks
+// This is now run in a background goroutine (O(N)) instead of on every signal (O(1))
+func (e *ExecutorFast) performCleanup() {
+	e.mu.Lock()
 	// Cleanup old entries from recentSignals
 	for id, ts := range e.recentSignals {
 		if time.Since(ts) > SignalCleanupTTL {
@@ -663,17 +667,16 @@ func (e *ExecutorFast) markSignalSeen(msgID int64) {
 		}
 	}
 
-	// Cleanup old entries from recentMints (was never cleaned - memory leak)
+	// Cleanup old entries from recentMints
 	for mint, ts := range e.recentMints {
 		if time.Since(ts) > SignalCleanupTTL {
 			delete(e.recentMints, mint)
 		}
 	}
+	e.mu.Unlock()
 
-	// Cleanup old entries from seen2X map (memory leak fix)
+	// Cleanup old entries from seen2X map
 	e.statsMu.Lock()
-	// seen2X tracks unique mints - clean entries older than 24h
-	// Note: This requires tracking timestamps, so we clear periodically
 	if len(e.seen2X) > 1000 {
 		e.seen2X = make(map[string]bool) // Reset if too large
 		log.Debug().Msg("cleared seen2X map (size exceeded 1000)")
@@ -812,6 +815,20 @@ func (e *ExecutorFast) StartMonitoring(ctx context.Context) {
 				return
 			case <-ticker.C:
 				e.monitorPositions(ctx)
+			}
+		}
+	}()
+
+	// ⚡ Bolt Optimization: Run cleanup in background instead of on every signal
+	cleanupTicker := time.NewTicker(1 * time.Minute)
+	go func() {
+		defer cleanupTicker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-cleanupTicker.C:
+				e.performCleanup()
 			}
 		}
 	}()
