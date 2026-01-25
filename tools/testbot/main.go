@@ -22,7 +22,7 @@ const testPrivateKey = "4wBqpZM9xaSheZzJSMawUHDgZ7miWfSsxmfVF5BJWybHxPNzLwBY3k1B
 
 func main() {
 	setupLogger()
-	
+
 	fmt.Println("🧪 TEST BOT - 1:1 Copy with Test Key")
 	fmt.Println("=====================================")
 	fmt.Println("This is an EXACT copy of your bot logic")
