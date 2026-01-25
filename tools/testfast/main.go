@@ -87,7 +87,7 @@ func main() {
 
 	fmt.Println("")
 	fmt.Printf("⚡ EXECUTION TIME: %dms\n", elapsed.Milliseconds())
-	
+
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n", err)
 		return
