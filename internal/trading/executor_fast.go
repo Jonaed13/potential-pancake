@@ -100,7 +100,13 @@ func (e *ExecutorFast) SetupWebSocket() error {
 	reconnectDelay := time.Duration(wsCfg.ReconnectDelayMs) * time.Millisecond
 	pingInterval := time.Duration(wsCfg.PingIntervalMs) * time.Millisecond
 
-	e.wsClient = ws.NewClient(wsCfg.ShyftURL, reconnectDelay, pingInterval)
+	wsURL := wsCfg.ShyftURL
+	if apiKey := e.cfg.GetShyftAPIKey(); apiKey != "" {
+		// Shyft uses ?api_key=
+		wsURL += "?api_key=" + apiKey
+	}
+
+	e.wsClient = ws.NewClient(wsURL, reconnectDelay, pingInterval)
 	// Note: stopCh is already initialized in NewExecutorFast
 
 	// Set connection callbacks

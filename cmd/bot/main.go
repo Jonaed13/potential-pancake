@@ -332,7 +332,26 @@ func initComponents() (
 	if wallet != nil {
 		// Initialize RPC client
 		rpcCfg := cfg.Get().RPC
-		rpc = blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+
+		shyftURL := rpcCfg.ShyftURL
+		if cfg.GetShyftAPIKey() != "" {
+			if strings.Contains(shyftURL, "?") {
+				shyftURL += "&api_key=" + cfg.GetShyftAPIKey()
+			} else {
+				shyftURL += "?api_key=" + cfg.GetShyftAPIKey()
+			}
+		}
+
+		fallbackURL := rpcCfg.FallbackURL
+		if cfg.GetFallbackAPIKey() != "" {
+			if strings.Contains(fallbackURL, "?") {
+				fallbackURL += "&api-key=" + cfg.GetFallbackAPIKey()
+			} else {
+				fallbackURL += "?api-key=" + cfg.GetFallbackAPIKey()
+			}
+		}
+
+		rpc = blockchain.NewRPCClient(shyftURL, fallbackURL, "")
 
 		// Initialize blockhash cache
 		blockhashCache = blockchain.NewBlockhashCache(

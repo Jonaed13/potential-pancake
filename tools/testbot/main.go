@@ -50,7 +50,9 @@ func main() {
 
 	// Initialize RPC (exact same)
 	rpcCfg := cfg.Get().RPC
-	rpc := blockchain.NewRPCClient(rpcCfg.ShyftURL, rpcCfg.FallbackURL, cfg.GetShyftAPIKey())
+	shyftURL := rpcCfg.ShyftURL + "?api_key=" + cfg.GetShyftAPIKey()
+	fallbackURL := rpcCfg.FallbackURL + "?api-key=" + cfg.GetFallbackAPIKey()
+	rpc := blockchain.NewRPCClient(shyftURL, fallbackURL, "")
 
 	// Initialize blockhash cache (exact same)
 	blockhashCache := blockchain.NewBlockhashCache(
@@ -102,7 +104,12 @@ func main() {
 	}
 
 	// Resolve token (exact same as real bot)
-	testSignal.Mint = resolver.Resolve(testSignal.TokenName)
+	mint, err := resolver.Resolve(testSignal.TokenName)
+	if err != nil {
+		fmt.Printf("❌ Failed to resolve token: %v\n", err)
+		return
+	}
+	testSignal.Mint = mint
 	fmt.Printf("Token: %s\n", testSignal.TokenName)
 	fmt.Printf("Mint: %s\n", testSignal.Mint)
 	fmt.Printf("Signal: %.1f%s (Type: %s)\n\n", testSignal.Value, testSignal.Unit, testSignal.Type)
