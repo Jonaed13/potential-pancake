@@ -825,6 +825,20 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 
 	cfg := e.cfg.GetTrading()
 
+	// ⚡ Bolt Optimization: Fetch all balances in 1 batch call
+	// Reduces RPC calls from O(N) to O(1)
+	var balanceMap map[string]uint64
+	var batchErr error
+
+	// Only fetch batch if not in simulation mode
+	isSim := e.simMode || e.cfg.Get().Trading.SimulationMode
+	if !isSim {
+		balanceMap, batchErr = e.rpc.GetAllTokenAccounts(ctx, e.wallet.Address())
+		if batchErr != nil {
+			log.Warn().Err(batchErr).Msg("failed to fetch batch token accounts, falling back to individual checks")
+		}
+	}
+
 	// ⚡ Bolt Optimization: Parallelize position monitoring
 	// Use a semaphore to limit concurrency and avoid API rate limits
 	const maxConcurrentChecks = 5
@@ -859,7 +873,16 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 			}
 
 			// Get current token balance
-			balance, err := e.getTokenBalance(ctx, pos.Mint)
+			var balance uint64
+			var err error
+
+			if !isSim && batchErr == nil {
+				// Use batched data
+				balance = balanceMap[pos.Mint]
+			} else {
+				// Fallback to individual check (or Simulation mode)
+				balance, err = e.getTokenBalance(ctx, pos.Mint)
+			}
 
 			// FIX: Handle 0 balance - mark position as lost/failed
 			if err != nil {
