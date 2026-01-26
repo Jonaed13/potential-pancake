@@ -389,15 +389,76 @@ type TokenAccountInfo struct {
 	Decimals uint8
 }
 
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
 // GetTokenAccountsByOwner fetches all token accounts for an owner and mint
 func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint string) ([]TokenAccountInfo, error) {
+	return c.getTokenAccountsInternal(ctx, owner, map[string]string{"mint": mint})
+}
+
+// GetAllTokenAccounts fetches all token accounts for an owner (both Legacy and Token-2022)
+// Returns a map of Mint -> Total Balance
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) (map[string]uint64, error) {
+	// We need to query both Token Program and Token-2022 Program
+	// We do this concurrently to minimize latency
+
+	var (
+		legacyAccounts []TokenAccountInfo
+		token22Accounts []TokenAccountInfo
+		errLegacy      error
+		errToken22     error
+		wg             sync.WaitGroup
+	)
+
+	wg.Add(2)
+
+	// Fetch Legacy Token Accounts
+	go func() {
+		defer wg.Done()
+		legacyAccounts, errLegacy = c.getTokenAccountsInternal(ctx, owner, map[string]string{"programId": TokenProgramID})
+	}()
+
+	// Fetch Token-2022 Accounts
+	go func() {
+		defer wg.Done()
+		token22Accounts, errToken22 = c.getTokenAccountsInternal(ctx, owner, map[string]string{"programId": Token2022ProgramID})
+	}()
+
+	wg.Wait()
+
+	if errLegacy != nil {
+		return nil, fmt.Errorf("failed to fetch legacy accounts: %w", errLegacy)
+	}
+	// Note: Token-2022 might not be supported by all RPCs or wallets, but we treat error as failure here
+	// to ensure complete state.
+	if errToken22 != nil {
+		return nil, fmt.Errorf("failed to fetch token-2022 accounts: %w", errToken22)
+	}
+
+	// Merge results
+	balanceMap := make(map[string]uint64)
+
+	for _, acc := range legacyAccounts {
+		balanceMap[acc.Mint] += acc.Amount
+	}
+	for _, acc := range token22Accounts {
+		balanceMap[acc.Mint] += acc.Amount
+	}
+
+	return balanceMap, nil
+}
+
+func (c *RPCClient) getTokenAccountsInternal(ctx context.Context, owner string, filter map[string]string) ([]TokenAccountInfo, error) {
 	req := RPCRequest{
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  "getTokenAccountsByOwner",
 		Params: []interface{}{
 			owner,
-			map[string]string{"mint": mint},
+			filter,
 			map[string]string{
 				"encoding": "jsonParsed",
 			},
