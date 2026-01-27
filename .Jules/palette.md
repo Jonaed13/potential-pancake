@@ -4,3 +4,7 @@
 1. Visible key hints (e.g., "[←/→] Adjust").
 2. Explicit visual states for toggles (Color-coded ON/OFF).
 3. "Invisible" safety rails (clamping values) to prevent invalid configurations.
+
+## 2025-05-23 - Contextual Help in Config Modals
+**Learning:** TUI configuration settings (like "MinEntryPercent") can be ambiguous. Users benefit significantly from immediate, in-context explanations of what each setting controls, rather than relying on external documentation.
+**Action:** When creating configuration interfaces, always pair the setting name with a brief, faint/italicized description that explains its impact or units.
