@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,6 +62,12 @@ func NewServer(host string, port int, handler *Handler) *Server {
 }
 
 func (s *Server) setupRoutes() {
+	// Rate limiter middleware (5 req/sec per IP)
+	limit := limiter.New(limiter.Config{
+		Max:        5,
+		Expiration: 1 * time.Second,
+	})
+
 	// Health check
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -69,8 +76,8 @@ func (s *Server) setupRoutes() {
 		})
 	})
 
-	// Signal endpoint
-	s.app.Post("/signal", s.handleSignal)
+	// Signal endpoint with rate limiting
+	s.app.Post("/signal", limit, s.handleSignal)
 }
 
 func (s *Server) handleSignal(c *fiber.Ctx) error {
