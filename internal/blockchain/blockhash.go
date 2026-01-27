@@ -89,7 +89,7 @@ func (c *BlockhashCache) Get() (string, error) {
 	// Both buffers stale - force synchronous refresh (rare)
 	c.misses.Add(1)
 	log.Warn().Msg("blockhash cache miss, forcing sync refresh")
-	
+
 	if err := c.fetchAndRotate(); err != nil {
 		return "", err
 	}

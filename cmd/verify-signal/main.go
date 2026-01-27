@@ -50,7 +50,7 @@ func main() {
 	fmt.Printf("Token: %s\n", sig.TokenName)
 	fmt.Printf("Value: %.2f %s\n", sig.Value, sig.Unit)
 	fmt.Printf("Type:  %s\n", sig.Type)
-	
+
 	if sig.Mint != "" {
 		fmt.Printf("CA:    %s\n", sig.Mint)
 	} else {

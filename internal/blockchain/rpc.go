@@ -15,16 +15,16 @@ import (
 
 // RPCClient handles Solana RPC calls
 type RPCClient struct {
-	primaryURL   string
-	fallbackURL  string
-	apiKey       string
-	httpClient   *http.Client
-	
+	primaryURL  string
+	fallbackURL string
+	apiKey      string
+	httpClient  *http.Client
+
 	// Circuit breaker state
-	mu           sync.RWMutex
-	failures     int
-	lastFailure  time.Time
-	circuitOpen  bool
+	mu          sync.RWMutex
+	failures    int
+	lastFailure time.Time
+	circuitOpen bool
 }
 
 // RPCRequest is the JSON-RPC 2.0 request format
@@ -132,10 +132,10 @@ func (c *RPCClient) SendTransaction(ctx context.Context, signedTx string, skipPr
 		Params: []interface{}{
 			signedTx,
 			map[string]interface{}{
-				"encoding":       "base64",
-				"skipPreflight":  skipPreflight,
+				"encoding":            "base64",
+				"skipPreflight":       skipPreflight,
 				"preflightCommitment": "processed",
-				"maxRetries":     3,
+				"maxRetries":          3,
 			},
 		},
 	}
@@ -290,10 +290,10 @@ func (c *RPCClient) LatencyMs() int64 {
 
 // SignatureStatus represents the status of a transaction signature
 type SignatureStatus struct {
-	Slot               uint64  `json:"slot"`
-	Confirmations      *uint64 `json:"confirmations"` // nil = finalized
-	Err                interface{} `json:"err"`       // nil = success, object = error details
-	ConfirmationStatus string  `json:"confirmationStatus"` // "processed", "confirmed", "finalized"
+	Slot               uint64      `json:"slot"`
+	Confirmations      *uint64     `json:"confirmations"`      // nil = finalized
+	Err                interface{} `json:"err"`                // nil = success, object = error details
+	ConfirmationStatus string      `json:"confirmationStatus"` // "processed", "confirmed", "finalized"
 }
 
 // GetSignatureStatuses checks the status of transaction signatures
@@ -363,7 +363,7 @@ func (c *RPCClient) CheckTransaction(ctx context.Context, signature string) (*Tx
 // TxCheckResult is a human-readable transaction check result
 type TxCheckResult struct {
 	Signature          string
-	Status             string      // "SUCCESS", "FAILED", "NOT_FOUND", "PENDING"
+	Status             string // "SUCCESS", "FAILED", "NOT_FOUND", "PENDING"
 	Message            string
 	Slot               uint64
 	Confirmations      uint64
@@ -387,6 +387,99 @@ type TokenAccountInfo struct {
 	Mint     string
 	Amount   uint64
 	Decimals uint8
+}
+
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
+// GetAllTokenAccounts fetches all token accounts for an owner (both Legacy and Token-2022)
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	// We need to fetch from both Token Program and Token-2022 Program
+	// We run these concurrently for speed
+
+	type result struct {
+		accounts []TokenAccountInfo
+		err      error
+	}
+
+	ch := make(chan result, 2)
+
+	fetch := func(programID string) {
+		req := RPCRequest{
+			JSONRPC: "2.0",
+			ID:      1,
+			Method:  "getTokenAccountsByOwner",
+			Params: []interface{}{
+				owner,
+				map[string]string{"programId": programID},
+				map[string]string{
+					"encoding": "jsonParsed",
+				},
+			},
+		}
+
+		var resp struct {
+			Value []struct {
+				Pubkey  string `json:"pubkey"`
+				Account struct {
+					Data struct {
+						Parsed struct {
+							Info struct {
+								Mint        string `json:"mint"`
+								TokenAmount struct {
+									Amount   string `json:"amount"`
+									Decimals uint8  `json:"decimals"`
+								} `json:"tokenAmount"`
+							} `json:"info"`
+						} `json:"parsed"`
+					} `json:"data"`
+				} `json:"account"`
+			} `json:"value"`
+		}
+
+		if err := c.call(ctx, req, &resp); err != nil {
+			ch <- result{nil, err}
+			return
+		}
+
+		accounts := make([]TokenAccountInfo, 0, len(resp.Value))
+		for _, v := range resp.Value {
+			var amount uint64
+			fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+			accounts = append(accounts, TokenAccountInfo{
+				Address:  v.Pubkey,
+				Mint:     v.Account.Data.Parsed.Info.Mint,
+				Amount:   amount,
+				Decimals: v.Account.Data.Parsed.Info.TokenAmount.Decimals,
+			})
+		}
+		ch <- result{accounts, nil}
+	}
+
+	go fetch(TokenProgramID)
+	go fetch(Token2022ProgramID)
+
+	var allAccounts []TokenAccountInfo
+	var errors []error
+
+	for i := 0; i < 2; i++ {
+		res := <-ch
+		if res.err != nil {
+			errors = append(errors, res.err)
+		} else {
+			allAccounts = append(allAccounts, res.accounts...)
+		}
+	}
+
+	// If any call failed, return error to force safe fallback
+	// Partial results are dangerous as they might lead to false 0 balances
+	if len(errors) > 0 {
+		return nil, fmt.Errorf("token fetch failed: %v", errors[0])
+	}
+
+	return allAccounts, nil
 }
 
 // GetTokenAccountsByOwner fetches all token accounts for an owner and mint

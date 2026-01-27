@@ -36,7 +36,7 @@ func (c *Checker) Start(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -46,22 +46,22 @@ func (c *Checker) Start(ctx context.Context) {
 			}
 		}
 	}()
-	
+
 	// Initial check
 	c.check()
 }
 
 func (c *Checker) check() {
 	var statuses []Status
-	
+
 	// Check RPC
 	rpcStatus := c.checkRPC()
 	statuses = append(statuses, rpcStatus)
-	
+
 	// Check Telegram HTTP
 	telegramStatus := c.checkHTTP()
 	statuses = append(statuses, telegramStatus)
-	
+
 	c.mu.Lock()
 	c.statuses = statuses
 	c.mu.Unlock()
@@ -69,14 +69,14 @@ func (c *Checker) check() {
 
 func (c *Checker) checkRPC() Status {
 	start := time.Now()
-	
+
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, _ := http.NewRequest("POST", c.rpcURL, nil)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	_, err := client.Do(req)
 	latency := time.Since(start)
-	
+
 	status := Status{
 		Name:    "RPC",
 		Latency: latency,
@@ -90,11 +90,11 @@ func (c *Checker) checkRPC() Status {
 
 func (c *Checker) checkHTTP() Status {
 	start := time.Now()
-	
+
 	client := &http.Client{Timeout: 5 * time.Second}
 	_, err := client.Get(c.httpURL + "/health")
 	latency := time.Since(start)
-	
+
 	status := Status{
 		Name:    "Telegram",
 		Latency: latency,
