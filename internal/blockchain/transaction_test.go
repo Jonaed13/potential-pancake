@@ -2,8 +2,8 @@ package blockchain
 
 import (
 	"crypto/ed25519"
-	"testing"
 	"github.com/mr-tron/base58"
+	"testing"
 )
 
 func TestSignSerializedTransaction_SimulationDummy(t *testing.T) {

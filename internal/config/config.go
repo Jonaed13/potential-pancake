@@ -30,27 +30,27 @@ type WalletConfig struct {
 }
 
 type RPCConfig struct {
-	ShyftURL      string `mapstructure:"shyft_url"`
+	ShyftURL       string `mapstructure:"shyft_url"`
 	ShyftAPIKeyEnv string `mapstructure:"shyft_api_key_env"`
-	FallbackURL   string `mapstructure:"fallback_url"`
+	FallbackURL    string `mapstructure:"fallback_url"`
 }
 
 type TradingConfig struct {
-	MinEntryPercent       float64 `mapstructure:"min_entry_percent"`
-	TakeProfitMultiple    float64 `mapstructure:"take_profit_multiple"`
-	MaxAllocPercent       float64 `mapstructure:"max_alloc_percent"`
-	MaxOpenPositions      int     `mapstructure:"max_open_positions"`
-	AutoTradingEnabled    bool    `mapstructure:"auto_trading_enabled"`
-	
+	MinEntryPercent    float64 `mapstructure:"min_entry_percent"`
+	TakeProfitMultiple float64 `mapstructure:"take_profit_multiple"`
+	MaxAllocPercent    float64 `mapstructure:"max_alloc_percent"`
+	MaxOpenPositions   int     `mapstructure:"max_open_positions"`
+	AutoTradingEnabled bool    `mapstructure:"auto_trading_enabled"`
+
 	// Partial Profit-Taking (sell X% at Y multiple)
 	PartialProfitPercent  float64 `mapstructure:"partial_profit_percent"`  // e.g., 50 = sell 50%
 	PartialProfitMultiple float64 `mapstructure:"partial_profit_multiple"` // e.g., 1.5 = at 1.5X
-	
+
 	// Time-Based Exit (auto-sell after X minutes)
-	MaxHoldMinutes        int     `mapstructure:"max_hold_minutes"` // 0 = disabled
+	MaxHoldMinutes int `mapstructure:"max_hold_minutes"` // 0 = disabled
 
 	// Simulation
-	SimulationMode        bool    `mapstructure:"simulation_mode"`  // Enable for CLI test verification
+	SimulationMode bool `mapstructure:"simulation_mode"` // Enable for CLI test verification
 }
 
 type FeesConfig struct {
@@ -86,9 +86,9 @@ type TUIConfig struct {
 }
 
 type WebSocketConfig struct {
-	ShyftURL        string `mapstructure:"shyft_url"`
-	ReconnectDelayMs int   `mapstructure:"reconnect_delay_ms"`
-	PingIntervalMs   int   `mapstructure:"ping_interval_ms"`
+	ShyftURL         string `mapstructure:"shyft_url"`
+	ReconnectDelayMs int    `mapstructure:"reconnect_delay_ms"`
+	PingIntervalMs   int    `mapstructure:"ping_interval_ms"`
 }
 
 // Manager handles config loading and hot-reload
@@ -130,8 +130,12 @@ func NewManager(configPath string) (*Manager, error) {
 	}
 
 	// Manual fallback if unmarshal leaves zero values (double check)
-	if cfg.Jupiter.QuoteAPIURL == "" { cfg.Jupiter.QuoteAPIURL = "https://quote-api.jup.ag/v6/quote" }
-	if cfg.Storage.SQLitePath == "" { cfg.Storage.SQLitePath = "./data/bot.db" }
+	if cfg.Jupiter.QuoteAPIURL == "" {
+		cfg.Jupiter.QuoteAPIURL = "https://quote-api.jup.ag/v6/quote"
+	}
+	if cfg.Storage.SQLitePath == "" {
+		cfg.Storage.SQLitePath = "./data/bot.db"
+	}
 
 	m := &Manager{
 		config: &cfg,
