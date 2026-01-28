@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
 // RPCClient handles Solana RPC calls
 type RPCClient struct {
 	primaryURL   string
@@ -440,4 +445,89 @@ func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint str
 	}
 
 	return accounts, nil
+}
+
+// GetTokenAccountsByProgram fetches all token accounts for an owner and program ID
+func (c *RPCClient) GetTokenAccountsByProgram(ctx context.Context, owner, programID string) ([]TokenAccountInfo, error) {
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "getTokenAccountsByOwner",
+		Params: []interface{}{
+			owner,
+			map[string]string{"programId": programID},
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
+	}
+
+	var result struct {
+		Value []struct {
+			Pubkey  string `json:"pubkey"`
+			Account struct {
+				Data struct {
+					Parsed struct {
+						Info struct {
+							Mint        string `json:"mint"`
+							TokenAmount struct {
+								Amount   string `json:"amount"`
+								Decimals uint8  `json:"decimals"`
+							} `json:"tokenAmount"`
+						} `json:"info"`
+					} `json:"parsed"`
+				} `json:"data"`
+			} `json:"account"`
+		} `json:"value"`
+	}
+
+	if err := c.call(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	accounts := make([]TokenAccountInfo, 0, len(result.Value))
+	for _, v := range result.Value {
+		var amount uint64
+		fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+		accounts = append(accounts, TokenAccountInfo{
+			Address:  v.Pubkey,
+			Mint:     v.Account.Data.Parsed.Info.Mint,
+			Amount:   amount,
+			Decimals: v.Account.Data.Parsed.Info.TokenAmount.Decimals,
+		})
+	}
+
+	return accounts, nil
+}
+
+// GetAllTokenAccounts fetches all token accounts (Legacy + Token-2022) concurrently
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	var wg sync.WaitGroup
+	var legacy, token2022 []TokenAccountInfo
+	var errLegacy, err2022 error
+
+	wg.Add(2)
+
+	// Fetch Legacy
+	go func() {
+		defer wg.Done()
+		legacy, errLegacy = c.GetTokenAccountsByProgram(ctx, owner, TokenProgramID)
+	}()
+
+	// Fetch Token-2022
+	go func() {
+		defer wg.Done()
+		token2022, err2022 = c.GetTokenAccountsByProgram(ctx, owner, Token2022ProgramID)
+	}()
+
+	wg.Wait()
+
+	if errLegacy != nil {
+		return nil, fmt.Errorf("legacy fetch failed: %w", errLegacy)
+	}
+	if err2022 != nil {
+		return nil, fmt.Errorf("token-2022 fetch failed: %w", err2022)
+	}
+
+	return append(legacy, token2022...), nil
 }
