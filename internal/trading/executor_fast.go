@@ -831,6 +831,21 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 	sem := make(chan struct{}, maxConcurrentChecks)
 	var wg sync.WaitGroup
 
+	// ⚡ Bolt Optimization: Batch fetch all token accounts first
+	// This reduces N+1 RPC calls to 1 (technically 2 for Legacy+2022)
+	var balanceMap map[string]uint64
+	if !e.simMode && !e.cfg.Get().Trading.SimulationMode {
+		accounts, err := e.rpc.GetAllTokenAccounts(ctx, e.wallet.Address())
+		if err == nil {
+			balanceMap = make(map[string]uint64)
+			for _, acc := range accounts {
+				balanceMap[acc.Mint] += acc.Amount
+			}
+		} else {
+			log.Warn().Err(err).Msg("batch token fetch failed, falling back to individual")
+		}
+	}
+
 	for _, pos := range positions {
 		wg.Add(1)
 		go func(pos *Position) {
@@ -859,7 +874,17 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 			}
 
 			// Get current token balance
-			balance, err := e.getTokenBalance(ctx, pos.Mint)
+			var balance uint64
+			var err error
+
+			if balanceMap != nil {
+				// O(1) lookup from batch result
+				balance = balanceMap[pos.Mint]
+				// err is nil
+			} else {
+				// Fallback to individual RPC call
+				balance, err = e.getTokenBalance(ctx, pos.Mint)
+			}
 
 			// FIX: Handle 0 balance - mark position as lost/failed
 			if err != nil {
