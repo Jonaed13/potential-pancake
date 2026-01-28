@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"solana-pump-bot/internal/blockchain"
+	"solana-pump-bot/internal/config"
 	"solana-pump-bot/internal/jupiter"
 )
 
@@ -31,8 +32,15 @@ func main() {
 	fmt.Println("=" + string(make([]byte, 50)))
 
 	// Initialize components
-	rpcURL := "https://rpc.shyft.to?api_key=48KZbYxP-9e9SpqR"
-	fallbackURL := "https://mainnet.helius-rpc.com/?api-key=465a28e0-e3b3-4991-8878-0e7adbb78f81"
+	// Load config
+	cfg, err := config.NewManager("config/config.yaml")
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to load config")
+	}
+
+	rpcURL := cfg.GetShyftRPCURL()
+	// Unused for simple speed test but consistent
+	fallbackURL := cfg.GetFallbackRPCURL()
 
 	totalStart := time.Now()
 	timings := make(map[string]time.Duration)

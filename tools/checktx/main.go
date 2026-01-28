@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"solana-pump-bot/internal/blockchain"
+	"solana-pump-bot/internal/config"
 )
 
 func main() {
@@ -22,12 +23,15 @@ func main() {
 	fmt.Println("===================")
 	fmt.Printf("TX: %s\n\n", txSig)
 
+	// Load config
+	cfg, err := config.NewManager("config/config.yaml")
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		return
+	}
+
 	// RPC
-	rpc := blockchain.NewRPCClient(
-		"https://rpc.shyft.to?api_key=48KZbYxP-9e9SpqR",
-		"https://mainnet.helius-rpc.com/?api-key=465a28e0-e3b3-4991-8878-0e7adbb78f81",
-		"",
-	)
+	rpc := blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
