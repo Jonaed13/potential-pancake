@@ -4,3 +4,7 @@
 1. Visible key hints (e.g., "[←/→] Adjust").
 2. Explicit visual states for toggles (Color-coded ON/OFF).
 3. "Invisible" safety rails (clamping values) to prevent invalid configurations.
+
+## 2025-05-23 - [Static Indicators in "Live" Dashboards]
+**Learning:** Hardcoding status indicators (like "[LIVE]") in dashboard headers creates a dangerous disconnect when the underlying system state (Paused/Running) changes. Users trust the header as the source of truth for system status.
+**Action:** Always bind status headers directly to the state variable (`m.Running`), using both text changes ("LIVE" vs "PAUSED") and color changes (Green vs Red) to ensure the status is unambiguous.
