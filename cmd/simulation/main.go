@@ -59,7 +59,7 @@ func main() {
     }
 
 	// Correct RPC Client init (3 args)
-	rpc := blockchain.NewRPCClient(cfg.Get().RPC.ShyftURL, cfg.Get().RPC.FallbackURL, cfg.Get().RPC.ShyftAPIKeyEnv)
+	rpc := blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), "")
 	
 	jup := jupiter.NewClient(cfg.Get().Jupiter.QuoteAPIURL, 50, 5*time.Second)
 	

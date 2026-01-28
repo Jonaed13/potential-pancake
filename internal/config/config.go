@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,9 +31,10 @@ type WalletConfig struct {
 }
 
 type RPCConfig struct {
-	ShyftURL      string `mapstructure:"shyft_url"`
-	ShyftAPIKeyEnv string `mapstructure:"shyft_api_key_env"`
-	FallbackURL   string `mapstructure:"fallback_url"`
+	ShyftURL          string `mapstructure:"shyft_url"`
+	ShyftAPIKeyEnv    string `mapstructure:"shyft_api_key_env"`
+	FallbackURL       string `mapstructure:"fallback_url"`
+	FallbackAPIKeyEnv string `mapstructure:"fallback_api_key_env"`
 }
 
 type TradingConfig struct {
@@ -114,6 +116,7 @@ func NewManager(configPath string) (*Manager, error) {
 	v.SetDefault("jupiter.timeout_seconds", 10)
 	v.SetDefault("rpc.shyft_api_key_env", "SHYFT_API_KEY")
 	v.SetDefault("rpc.fallback_url", "https://api.mainnet-beta.solana.com")
+	v.SetDefault("rpc.fallback_api_key_env", "HELIUS_API_KEY")
 	v.SetDefault("storage.sqlite_path", "./data/bot.db")
 	v.SetDefault("storage.signals_buffer_size", 100)
 	v.SetDefault("tui.refresh_rate_ms", 100)
@@ -225,6 +228,53 @@ func (m *Manager) GetShyftAPIKey() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+}
+
+// GetFallbackAPIKey loads Fallback API key from environment
+func (m *Manager) GetFallbackAPIKey() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return os.Getenv(m.config.RPC.FallbackAPIKeyEnv)
+}
+
+// GetShyftRPCURL returns the full Shyft RPC URL with API key injected if needed
+func (m *Manager) GetShyftRPCURL() string {
+	m.mu.RLock()
+	url := m.config.RPC.ShyftURL
+	m.mu.RUnlock()
+
+	key := m.GetShyftAPIKey()
+	return appendAPIKey(url, key, "api_key")
+}
+
+// GetFallbackRPCURL returns the full Fallback RPC URL with API key injected if needed
+func (m *Manager) GetFallbackRPCURL() string {
+	m.mu.RLock()
+	url := m.config.RPC.FallbackURL
+	m.mu.RUnlock()
+
+	key := m.GetFallbackAPIKey()
+	return appendAPIKey(url, key, "api-key") // Helius uses dash
+}
+
+// GetShyftWSURL returns the full Shyft WebSocket URL with API key injected if needed
+func (m *Manager) GetShyftWSURL() string {
+	m.mu.RLock()
+	url := m.config.WebSocket.ShyftURL
+	m.mu.RUnlock()
+
+	key := m.GetShyftAPIKey()
+	return appendAPIKey(url, key, "api_key")
+}
+
+func appendAPIKey(url, key, paramName string) string {
+	if key == "" || strings.Contains(url, paramName) {
+		return url
+	}
+	if strings.Contains(url, "?") {
+		return url + "&" + paramName + "=" + key
+	}
+	return url + "?" + paramName + "=" + key
 }
 
 // GetBlockhashRefresh returns blockhash refresh interval as duration
