@@ -50,7 +50,7 @@ func main() {
 	log.Info().Str("address", wallet.Address()).Msg("wallet loaded")
 
 	// 4. Init Components
-	rpc := blockchain.NewRPCClient(cfg.Get().RPC.ShyftURL, cfg.Get().RPC.FallbackURL, cfg.Get().RPC.ShyftAPIKeyEnv)
+	rpc := blockchain.NewRPCClient(cfg.GetShyftRPCURL(), cfg.GetFallbackRPCURL(), "")
 	jup := jupiter.NewClient(cfg.Get().Jupiter.QuoteAPIURL, 50, 5*time.Second)
 	blockhashCache := blockchain.NewBlockhashCache(rpc, 100*time.Millisecond, 30*time.Second)
 	balance := blockchain.NewBalanceTracker(wallet, rpc)
