@@ -389,6 +389,64 @@ type TokenAccountInfo struct {
 	Decimals uint8
 }
 
+const (
+	TokenProgramID     = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
+// GetAllTokenAccounts fetches all token accounts for an owner (Standard Token Program)
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "getTokenAccountsByOwner",
+		Params: []interface{}{
+			owner,
+			map[string]string{"programId": TokenProgramID},
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
+	}
+
+	var result struct {
+		Value []struct {
+			Pubkey  string `json:"pubkey"`
+			Account struct {
+				Data struct {
+					Parsed struct {
+						Info struct {
+							Mint        string `json:"mint"`
+							TokenAmount struct {
+								Amount   string `json:"amount"`
+								Decimals uint8  `json:"decimals"`
+							} `json:"tokenAmount"`
+						} `json:"info"`
+					} `json:"parsed"`
+				} `json:"data"`
+			} `json:"account"`
+		} `json:"value"`
+	}
+
+	if err := c.call(ctx, req, &result); err != nil {
+		return nil, err
+	}
+
+	accounts := make([]TokenAccountInfo, 0, len(result.Value))
+	for _, v := range result.Value {
+		var amount uint64
+		fmt.Sscanf(v.Account.Data.Parsed.Info.TokenAmount.Amount, "%d", &amount)
+		accounts = append(accounts, TokenAccountInfo{
+			Address:  v.Pubkey,
+			Mint:     v.Account.Data.Parsed.Info.Mint,
+			Amount:   amount,
+			Decimals: v.Account.Data.Parsed.Info.TokenAmount.Decimals,
+		})
+	}
+
+	return accounts, nil
+}
+
 // GetTokenAccountsByOwner fetches all token accounts for an owner and mint
 func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint string) ([]TokenAccountInfo, error) {
 	req := RPCRequest{
