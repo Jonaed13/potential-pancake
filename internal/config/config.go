@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,9 +31,10 @@ type WalletConfig struct {
 }
 
 type RPCConfig struct {
-	ShyftURL      string `mapstructure:"shyft_url"`
-	ShyftAPIKeyEnv string `mapstructure:"shyft_api_key_env"`
-	FallbackURL   string `mapstructure:"fallback_url"`
+	ShyftURL          string `mapstructure:"shyft_url"`
+	ShyftAPIKeyEnv    string `mapstructure:"shyft_api_key_env"`
+	FallbackURL       string `mapstructure:"fallback_url"`
+	FallbackAPIKeyEnv string `mapstructure:"fallback_api_key_env"`
 }
 
 type TradingConfig struct {
@@ -113,6 +115,7 @@ func NewManager(configPath string) (*Manager, error) {
 	v.SetDefault("jupiter.slippage_bps", 500) // 5%
 	v.SetDefault("jupiter.timeout_seconds", 10)
 	v.SetDefault("rpc.shyft_api_key_env", "SHYFT_API_KEY")
+	v.SetDefault("rpc.fallback_api_key_env", "HELIUS_API_KEY")
 	v.SetDefault("rpc.fallback_url", "https://api.mainnet-beta.solana.com")
 	v.SetDefault("storage.sqlite_path", "./data/bot.db")
 	v.SetDefault("storage.signals_buffer_size", 100)
@@ -225,6 +228,70 @@ func (m *Manager) GetShyftAPIKey() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+}
+
+// GetFallbackAPIKey loads Fallback API key from environment
+func (m *Manager) GetFallbackAPIKey() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return os.Getenv(m.config.RPC.FallbackAPIKeyEnv)
+}
+
+// GetShyftRPCURL returns the full Shyft RPC URL with API key injected
+func (m *Manager) GetShyftRPCURL() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	url := m.config.RPC.ShyftURL
+	key := os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+	if key == "" {
+		return url
+	}
+
+	if strings.Contains(url, "?") {
+		return url + "&api_key=" + key
+	}
+	return url + "?api_key=" + key
+}
+
+// GetFallbackRPCURL returns the full Fallback RPC URL with API key injected
+func (m *Manager) GetFallbackRPCURL() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	url := m.config.RPC.FallbackURL
+	key := os.Getenv(m.config.RPC.FallbackAPIKeyEnv)
+	if key == "" {
+		return url
+	}
+
+	// Detect provider param style
+	param := "api_key"
+	if strings.Contains(url, "helius") {
+		param = "api-key"
+	}
+
+	if strings.Contains(url, "?") {
+		return url + "&" + param + "=" + key
+	}
+	return url + "?" + param + "=" + key
+}
+
+// GetShyftWSURL returns the full Shyft WebSocket URL with API key injected
+func (m *Manager) GetShyftWSURL() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	url := m.config.WebSocket.ShyftURL
+	key := os.Getenv(m.config.RPC.ShyftAPIKeyEnv)
+	if key == "" {
+		return url
+	}
+
+	if strings.Contains(url, "?") {
+		return url + "&api_key=" + key
+	}
+	return url + "?api_key=" + key
 }
 
 // GetBlockhashRefresh returns blockhash refresh interval as duration
