@@ -4,3 +4,7 @@
 1. Visible key hints (e.g., "[←/→] Adjust").
 2. Explicit visual states for toggles (Color-coded ON/OFF).
 3. "Invisible" safety rails (clamping values) to prevent invalid configurations.
+
+## 2024-05-22 - [Contextual Help in Configuration]
+**Learning:** In complex TUI applications, users often struggle to remember what specific acronyms or settings do without leaving the interface. Providing inline descriptions for the currently selected item transforms a "guessing game" into an informed decision-making process.
+**Action:** Implement dynamic description footers in lists/modals that update instantly as the user navigates, providing "just-in-time" documentation.
