@@ -831,6 +831,21 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 	sem := make(chan struct{}, maxConcurrentChecks)
 	var wg sync.WaitGroup
 
+	// ⚡ Bolt Optimization: Batch fetch all token accounts to reduce RPC calls (N -> 1)
+	tokenBalances := make(map[string]uint64)
+	var useBatch bool
+	if !e.simMode && !e.cfg.Get().Trading.SimulationMode {
+		if accounts, err := e.rpc.GetAllTokenAccounts(ctx, e.wallet.Address()); err == nil {
+			useBatch = true
+			for _, acc := range accounts {
+				tokenBalances[acc.Mint] += acc.Amount
+			}
+			log.Debug().Int("accounts", len(accounts)).Msg("Batch fetched token accounts")
+		} else {
+			log.Warn().Err(err).Msg("Batch fetch failed, falling back to individual calls")
+		}
+	}
+
 	for _, pos := range positions {
 		wg.Add(1)
 		go func(pos *Position) {
@@ -859,7 +874,19 @@ func (e *ExecutorFast) monitorPositions(ctx context.Context) {
 			}
 
 			// Get current token balance
-			balance, err := e.getTokenBalance(ctx, pos.Mint)
+			var balance uint64
+			var err error
+
+			if useBatch {
+				if val, ok := tokenBalances[pos.Mint]; ok {
+					balance = val
+				} else {
+					// Fallback for Token-2022 or if not found in batch
+					balance, err = e.getTokenBalance(ctx, pos.Mint)
+				}
+			} else {
+				balance, err = e.getTokenBalance(ctx, pos.Mint)
+			}
 
 			// FIX: Handle 0 balance - mark position as lost/failed
 			if err != nil {
