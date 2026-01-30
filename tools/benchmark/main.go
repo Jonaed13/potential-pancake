@@ -7,15 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sort"
 	"time"
 )
-
-// RPC endpoints
-var endpoints = map[string]string{
-	"Helius": "https://mainnet.helius-rpc.com/?api-key=465a28e0-e3b3-4991-8878-0e7adbb78f81",
-	"Shyft":  "https://rpc.shyft.to?api_key=48KZbYxP-9e9SpqR",
-}
 
 // Test wallet for getBalance (random known wallet)
 const testWallet = "vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg"
@@ -38,6 +33,29 @@ func main() {
 	fmt.Println("🔬 RPC Endpoint Benchmark")
 	fmt.Println("=" + string(make([]byte, 60)))
 	fmt.Printf("Time: %s\n\n", time.Now().Format("2006-01-02 15:04:05"))
+
+	// RPC endpoints
+	shyftKey := os.Getenv("SHYFT_API_KEY")
+	heliusKey := os.Getenv("HELIUS_API_KEY")
+
+	endpoints := make(map[string]string)
+
+	if shyftKey != "" {
+		endpoints["Shyft"] = "https://rpc.shyft.to?api_key=" + shyftKey
+	} else {
+		fmt.Println("Warning: SHYFT_API_KEY not set (skipping Shyft)")
+	}
+
+	if heliusKey != "" {
+		endpoints["Helius"] = "https://mainnet.helius-rpc.com/?api-key=" + heliusKey
+	} else {
+		fmt.Println("Warning: HELIUS_API_KEY not set (skipping Helius)")
+	}
+
+	if len(endpoints) == 0 {
+		fmt.Println("No API keys provided! Set SHYFT_API_KEY or HELIUS_API_KEY.")
+		os.Exit(1)
+	}
 
 	// Methods to test
 	allMethods := []struct {

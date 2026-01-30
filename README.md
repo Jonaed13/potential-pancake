@@ -21,7 +21,8 @@ cp .env.example .env
 # - TG_API_ID, TG_API_HASH (from https://my.telegram.org)
 # - TG_PHONE, TG_CHANNEL_ID
 # - WALLET_PRIVATE_KEY (Base58 encoded)
-# - SHYFT_API_KEY (optional, for paid RPC)
+# - SHYFT_API_KEY (for Shyft RPC)
+# - HELIUS_API_KEY (for fallback RPC)
 ```
 
 ### 2. Install Python Dependencies

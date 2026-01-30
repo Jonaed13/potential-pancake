@@ -31,8 +31,20 @@ func main() {
 	fmt.Println("=" + string(make([]byte, 50)))
 
 	// Initialize components
-	rpcURL := "https://rpc.shyft.to?api_key=48KZbYxP-9e9SpqR"
-	fallbackURL := "https://mainnet.helius-rpc.com/?api-key=465a28e0-e3b3-4991-8878-0e7adbb78f81"
+	shyftKey := os.Getenv("SHYFT_API_KEY")
+	heliusKey := os.Getenv("HELIUS_API_KEY")
+
+	rpcURL := "https://rpc.shyft.to?api_key=" + shyftKey
+	fallbackURL := "https://mainnet.helius-rpc.com/?api-key=" + heliusKey
+
+	if shyftKey == "" {
+		log.Warn().Msg("SHYFT_API_KEY not set, using base URL (may fail)")
+		rpcURL = "https://rpc.shyft.to"
+	}
+	if heliusKey == "" {
+		log.Warn().Msg("HELIUS_API_KEY not set, using base URL (may fail)")
+		fallbackURL = "https://mainnet.helius-rpc.com"
+	}
 
 	totalStart := time.Now()
 	timings := make(map[string]time.Duration)
