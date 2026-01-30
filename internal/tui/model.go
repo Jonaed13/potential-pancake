@@ -106,7 +106,7 @@ var keys = KeyMap{
 	Search: key.NewBinding(key.WithKeys("/")),
 	Clear:  key.NewBinding(key.WithKeys("f9")),
 	Export: key.NewBinding(key.WithKeys("e")),
-	Theme:  key.NewBinding(key.WithKeys("t")),
+	Theme:  key.NewBinding(key.WithKeys("T")),
 	Health: key.NewBinding(key.WithKeys("5")),
 	Tab1:   key.NewBinding(key.WithKeys("1")),
 	Tab2:   key.NewBinding(key.WithKeys("2")),
