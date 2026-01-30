@@ -23,11 +23,22 @@ func main() {
 	fmt.Printf("TX: %s\n\n", txSig)
 
 	// RPC
-	rpc := blockchain.NewRPCClient(
-		"https://rpc.shyft.to?api_key=48KZbYxP-9e9SpqR",
-		"https://mainnet.helius-rpc.com/?api-key=465a28e0-e3b3-4991-8878-0e7adbb78f81",
-		"",
-	)
+	shyftKey := os.Getenv("SHYFT_API_KEY")
+	heliusKey := os.Getenv("HELIUS_API_KEY")
+
+	rpcURL := "https://rpc.shyft.to?api_key=" + shyftKey
+	fallbackURL := "https://mainnet.helius-rpc.com/?api-key=" + heliusKey
+
+	if shyftKey == "" {
+		fmt.Println("Warning: SHYFT_API_KEY not set")
+		rpcURL = "https://rpc.shyft.to"
+	}
+	if heliusKey == "" {
+		fmt.Println("Warning: HELIUS_API_KEY not set")
+		fallbackURL = "https://mainnet.helius-rpc.com"
+	}
+
+	rpc := blockchain.NewRPCClient(rpcURL, fallbackURL, "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
