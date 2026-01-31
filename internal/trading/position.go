@@ -12,13 +12,13 @@ import (
 type Position struct {
 	Mint       string
 	TokenName  string
-	Size       float64   // SOL amount spent
-	EntryValue float64   // Entry signal value
-	EntryUnit  string    // "%" or "X"
+	Size       float64 // SOL amount spent
+	EntryValue float64 // Entry signal value
+	EntryUnit  string  // "%" or "X"
 	EntryTime  time.Time
-	EntryTxSig   string
-	MsgID        int64
-	PoolAddr     string // AMM pool address for price tracking
+	EntryTxSig string
+	MsgID      int64
+	PoolAddr   string // AMM pool address for price tracking
 	// Dynamic fields for TUI/Tracking
 	CurrentValue float64
 	PnLSol       float64
@@ -142,7 +142,6 @@ func (p *Position) SetStatsFromSignal(val float64, unit string) {
 	p.LastUpdate = time.Now()
 }
 
-
 // PositionTracker manages active positions
 type PositionTracker struct {
 	mu        sync.RWMutex
@@ -176,13 +175,13 @@ func (pt *PositionTracker) loadFromDB() {
 
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	loaded := 0
 	stale := 0
-	
+
 	for _, p := range positions {
 		entryTime := time.Unix(p.EntryTime, 0)
-		
+
 		if time.Since(entryTime) > 24*time.Hour {
 			stale++
 			log.Debug().
@@ -191,13 +190,13 @@ func (pt *PositionTracker) loadFromDB() {
 				Msg("skipping stale position from DB")
 			continue
 		}
-		
+
 		if p.EntryTxSig == "PENDING" && time.Since(entryTime) > 10*time.Minute {
 			stale++
 			log.Debug().Str("token", p.TokenName).Msg("skipping old PENDING position")
 			continue
 		}
-		
+
 		pt.positions[p.Mint] = &Position{
 			Mint:         p.Mint,
 			TokenName:    p.TokenName,
@@ -212,7 +211,7 @@ func (pt *PositionTracker) loadFromDB() {
 		}
 		loaded++
 	}
-	
+
 	if stale > 0 {
 		log.Warn().Int("stale", stale).Int("loaded", loaded).Msg("cleaned up stale positions from DB")
 	} else {
@@ -328,16 +327,16 @@ func (pt *PositionTracker) SetMaxPositions(max int) {
 func (pt *PositionTracker) ClearAll() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	// Clear DB
 	if pt.db != nil {
 		for mint := range pt.positions {
 			pt.db.DeletePosition(mint)
 		}
 	}
-	
+
 	// Clear memory
 	pt.positions = make(map[string]*Position)
-	
+
 	log.Info().Msg("all positions cleared")
 }

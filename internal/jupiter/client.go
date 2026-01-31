@@ -29,7 +29,7 @@ type Client struct {
 	apiKeys     []string
 	keyIdx      atomic.Uint32
 	maxLamports uint64 // Max priority fee cap
-	
+
 	// Simulation
 	simMode       bool
 	simMultiplier float64
@@ -105,7 +105,7 @@ func NewClientWithKeys(baseURL string, slippageBps int, timeout time.Duration, a
 			apiKeys = DefaultAPIKeys()
 		}
 	}
-	
+
 	return &Client{
 		baseURL:       MetisSwapURL, // Use Metis endpoint
 		slippageBps:   slippageBps,
@@ -164,8 +164,8 @@ type SwapInfo struct {
 
 // SwapResponse from Jupiter Metis
 type SwapResponse struct {
-	SwapTransaction          string `json:"swapTransaction"`
-	LastValidBlockHeight     uint64 `json:"lastValidBlockHeight"`
+	SwapTransaction           string `json:"swapTransaction"`
+	LastValidBlockHeight      uint64 `json:"lastValidBlockHeight"`
 	PrioritizationFeeLamports uint64 `json:"prioritizationFeeLamports"`
 }
 
@@ -185,25 +185,25 @@ func (c *Client) GetQuote(ctx context.Context, inputMint, outputMint string, amo
 	isSim := c.simMode
 	mult := c.simMultiplier
 	c.simMu.RUnlock()
-	
+
 	if isSim {
 		// Mock logic: return amount * multiplier
 		// If input is SOL (SOLMint), we are buying -> return output (Tokens) * multiplier?
 		// Usually price is determined by market.
-		// For our test: 
+		// For our test:
 		// "Assume random coin reached 50%" calls GetQuote? No, Telegram signal provides price.
 		// Monitoring loop calls GetQuote to check value of HELD TOKENS (Input=Token, Output=SOL).
-		
+
 		// If Input != SOLMint (Selling/Checking Value):
 		if inputMint != "So11111111111111111111111111111111111111112" {
 			// Calculate Mock Output (SOL)
 			// Assume 1:1 base price * multiplier
 			outAmt := float64(amountLamports) * mult
 			return &QuoteResponse{
-				InputMint: inputMint,
-				InAmount: fmt.Sprintf("%d", amountLamports),
-				OutputMint: outputMint,
-				OutAmount: fmt.Sprintf("%.0f", outAmt),
+				InputMint:      inputMint,
+				InAmount:       fmt.Sprintf("%d", amountLamports),
+				OutputMint:     outputMint,
+				OutAmount:      fmt.Sprintf("%.0f", outAmt),
 				PriceImpactPct: "0.0",
 			}, nil
 		} else {
@@ -213,12 +213,12 @@ func (c *Client) GetQuote(ctx context.Context, inputMint, outputMint string, amo
 			// Multiplier usually applies to PRICE. If price is 2.5X, buying gives FEWER tokens.
 			// But for simulation simplicity:
 			// Just return OutAmount = InAmount. (1:1)
-			outAmt := amountLamports 
+			outAmt := amountLamports
 			return &QuoteResponse{
-				InputMint: inputMint,
-				InAmount: fmt.Sprintf("%d", amountLamports),
-				OutputMint: outputMint,
-				OutAmount: fmt.Sprintf("%d", outAmt),
+				InputMint:      inputMint,
+				InAmount:       fmt.Sprintf("%d", amountLamports),
+				OutputMint:     outputMint,
+				OutAmount:      fmt.Sprintf("%d", outAmt),
 				PriceImpactPct: "0.0",
 			}, nil
 		}
@@ -301,8 +301,8 @@ func (c *Client) GetSwapTransaction(ctx context.Context, inputMint, outputMint, 
 		QuoteResponse:            quote,
 		UserPublicKey:            userPubkey,
 		WrapAndUnwrapSol:         true,
-		DynamicComputeUnitLimit:  true,  // Let Jupiter optimize compute units
-		SkipUserAccountsRpcCalls: true,  // Speed optimization
+		DynamicComputeUnitLimit:  true, // Let Jupiter optimize compute units
+		SkipUserAccountsRpcCalls: true, // Speed optimization
 		PrioritizationFeeLamports: &PriorityLevelWithMaxLamports{
 			PriorityLevelWithMaxLamports: struct {
 				PriorityLevel string `json:"priorityLevel"`

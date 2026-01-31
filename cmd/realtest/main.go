@@ -38,7 +38,7 @@ func main() {
 
 	// Override settings for safety
 	cfg.Update(func(c *config.Config) {
-		c.Trading.SimulationMode = false // REAL MODE
+		c.Trading.SimulationMode = false     // REAL MODE
 		c.Trading.AutoTradingEnabled = false // Manual control only
 	})
 
@@ -123,7 +123,7 @@ func main() {
 	log.Info().Msg("--- STEP 5: CHECK TOKEN BALANCE ---")
 	tracker := trading.NewPositionTracker(nil, 10)
 	executor := trading.NewExecutorFast(cfg, wallet, rpc, jup, txBuilder, tracker, balance, nil)
-	
+
 	// Use internal method to get token balance
 	// We need to check if we actually received tokens
 	tokenBalance, err := getTokenBalanceRPC(ctx, rpc, wallet.Address(), TestTokenMint)
@@ -177,7 +177,7 @@ func main() {
 		Str("buyTx", txSig).
 		Str("sellTx", sellSig).
 		Msg("transaction summary")
-	
+
 	// Keep executor reference to avoid unused import
 	_ = executor
 }

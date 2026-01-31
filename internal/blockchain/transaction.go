@@ -12,8 +12,8 @@ const ComputeBudgetProgramID = "ComputeBudget111111111111111111111111111111"
 
 // TransactionBuilder builds Solana transactions
 type TransactionBuilder struct {
-	wallet         *Wallet
-	blockhashCache *BlockhashCache
+	wallet              *Wallet
+	blockhashCache      *BlockhashCache
 	priorityFeeLamports uint64
 	computeUnitLimit    uint32
 }
@@ -45,7 +45,7 @@ func (b *TransactionBuilder) BuildComputeBudgetInstructions() (setLimit []byte, 
 	// Format: [1 byte instruction type] [8 bytes microLamports per CU]
 	// Calculate: priorityFeeLamports / computeUnitLimit = microLamports per CU
 	microLamportsPerCU := (b.priorityFeeLamports * 1_000_000) / uint64(b.computeUnitLimit)
-	
+
 	setPrice = make([]byte, 9)
 	setPrice[0] = 3 // SetComputeUnitPrice
 	binary.LittleEndian.PutUint64(setPrice[1:], microLamportsPerCU)
@@ -73,7 +73,7 @@ func (b *TransactionBuilder) SignSerializedTransaction(serializedTxBase64 string
 
 	// For Jupiter swap transactions, they are typically versioned (v0)
 	// The message starts after the signature section
-	
+
 	// Find message portion (skip signature count and placeholder signatures)
 	// First byte is signature count in compact-u16 format
 	sigCount := int(txBytes[0])
@@ -81,13 +81,13 @@ func (b *TransactionBuilder) SignSerializedTransaction(serializedTxBase64 string
 		// Message starts at byte 1
 		message := txBytes[1:]
 		signature := b.wallet.Sign(message)
-		
+
 		// Build signed transaction: [1 sig count][signature][message]
 		signedTx := make([]byte, 1+64+len(message))
 		signedTx[0] = 1 // 1 signature
 		copy(signedTx[1:65], signature)
 		copy(signedTx[65:], message)
-		
+
 		return base64.StdEncoding.EncodeToString(signedTx), nil
 	}
 
@@ -101,7 +101,7 @@ func (b *TransactionBuilder) SignSerializedTransaction(serializedTxBase64 string
 
 	// Extract message
 	message := txBytes[messageOffset:]
-	
+
 	// Sign message
 	signature := b.wallet.Sign(message)
 
