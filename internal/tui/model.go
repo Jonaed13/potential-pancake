@@ -1706,25 +1706,43 @@ func (m Model) renderNeonDashboard() string {
 
 func (m Model) renderNeonFooter(w int) string {
 	// Status
-	status := fmt.Sprintf(" ⏱ %s │ 💰 %+.2f%%", 
+	status := fmt.Sprintf(" ⏱ %s │ 💰 %+.2f%%",
 		time.Since(m.StartTime).Truncate(time.Second),
 		m.Positions.TotalPnLPercent,
 	)
-	
-	// Controls
-	controls := "[TAB/←→]Focus [↑↓]Scroll [Q]uit "
-	
+
+	// Controls with separate coloring
+	// Key Color: Cyan (#00ffff), Description: Pink (#ff00ff)
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00ffff"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff00ff"))
+
+	// Helper for rendering a key-desc pair
+	k := func(key, desc string) string {
+		return keyStyle.Render("["+key+"]") + descStyle.Render(desc) + " "
+	}
+
+	controls := lipgloss.JoinHorizontal(lipgloss.Left,
+		k("?", "Help"),
+		k("C", "fg"),
+		k("P", "ause"),
+		k("S", "ell"),
+		k("TAB", "Focus"),
+		k("Q", "uit"),
+	)
+
 	// Spacer
 	spaceAvailable := w - lipgloss.Width(status) - lipgloss.Width(controls)
-	if spaceAvailable < 0 { spaceAvailable = 0 }
+	if spaceAvailable < 0 {
+		spaceAvailable = 0
+	}
 	spacer := strings.Repeat(" ", spaceAvailable)
-	
+
 	bar := lipgloss.JoinHorizontal(lipgloss.Bottom,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#00ffff")).Render(status),
 		spacer,
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff00ff")).Render(controls),
+		controls,
 	)
-	
+
 	return lipgloss.NewStyle().
 		Width(w).
 		Background(lipgloss.Color("#111111")).
