@@ -116,7 +116,7 @@ func (m *Metrics) percentile(p int) int64 {
 	// Copy and sort
 	sorted := make([]int64, count)
 	copy(sorted, m.samples[:count])
-	
+
 	// Simple bubble sort for small arrays
 	for i := 0; i < len(sorted)-1; i++ {
 		for j := 0; j < len(sorted)-i-1; j++ {
@@ -156,12 +156,12 @@ func (m *Metrics) Stats() (total, success, failed int64, successRate float64) {
 
 // TradeTimer helps time individual trade components
 type TradeTimer struct {
-	start     time.Time
-	parseEnd  time.Time
+	start      time.Time
+	parseEnd   time.Time
 	resolveEnd time.Time
-	quoteEnd  time.Time
-	signEnd   time.Time
-	sendEnd   time.Time
+	quoteEnd   time.Time
+	signEnd    time.Time
+	sendEnd    time.Time
 }
 
 // NewTradeTimer starts timing a trade

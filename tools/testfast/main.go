@@ -75,19 +75,23 @@ func main() {
 		Timestamp: time.Now().Unix(),
 		MsgID:     1,
 	}
-	signal.Mint = resolver.Resolve(signal.TokenName)
+	mint, err := resolver.Resolve(signal.TokenName)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to resolve token")
+	}
+	signal.Mint = mint
 
 	fmt.Println("🚀 EXECUTING BUY")
 	fmt.Printf("Token: %s → %s\n\n", signal.TokenName, signal.Mint[:20]+"...")
 
 	// Execute
 	start := time.Now()
-	err := executor.ProcessSignalFast(context.Background(), signal)
+	err = executor.ProcessSignalFast(context.Background(), signal)
 	elapsed := time.Since(start)
 
 	fmt.Println("")
 	fmt.Printf("⚡ EXECUTION TIME: %dms\n", elapsed.Milliseconds())
-	
+
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n", err)
 		return

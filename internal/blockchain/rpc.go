@@ -13,18 +13,25 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// TokenProgramID is the standard SPL Token Program ID
+	TokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	// Token2022ProgramID is the SPL Token-2022 Program ID
+	Token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+)
+
 // RPCClient handles Solana RPC calls
 type RPCClient struct {
-	primaryURL   string
-	fallbackURL  string
-	apiKey       string
-	httpClient   *http.Client
-	
+	primaryURL  string
+	fallbackURL string
+	apiKey      string
+	httpClient  *http.Client
+
 	// Circuit breaker state
-	mu           sync.RWMutex
-	failures     int
-	lastFailure  time.Time
-	circuitOpen  bool
+	mu          sync.RWMutex
+	failures    int
+	lastFailure time.Time
+	circuitOpen bool
 }
 
 // RPCRequest is the JSON-RPC 2.0 request format
@@ -132,10 +139,10 @@ func (c *RPCClient) SendTransaction(ctx context.Context, signedTx string, skipPr
 		Params: []interface{}{
 			signedTx,
 			map[string]interface{}{
-				"encoding":       "base64",
-				"skipPreflight":  skipPreflight,
+				"encoding":            "base64",
+				"skipPreflight":       skipPreflight,
 				"preflightCommitment": "processed",
-				"maxRetries":     3,
+				"maxRetries":          3,
 			},
 		},
 	}
@@ -290,10 +297,10 @@ func (c *RPCClient) LatencyMs() int64 {
 
 // SignatureStatus represents the status of a transaction signature
 type SignatureStatus struct {
-	Slot               uint64  `json:"slot"`
-	Confirmations      *uint64 `json:"confirmations"` // nil = finalized
-	Err                interface{} `json:"err"`       // nil = success, object = error details
-	ConfirmationStatus string  `json:"confirmationStatus"` // "processed", "confirmed", "finalized"
+	Slot               uint64      `json:"slot"`
+	Confirmations      *uint64     `json:"confirmations"`      // nil = finalized
+	Err                interface{} `json:"err"`                // nil = success, object = error details
+	ConfirmationStatus string      `json:"confirmationStatus"` // "processed", "confirmed", "finalized"
 }
 
 // GetSignatureStatuses checks the status of transaction signatures
@@ -363,7 +370,7 @@ func (c *RPCClient) CheckTransaction(ctx context.Context, signature string) (*Tx
 // TxCheckResult is a human-readable transaction check result
 type TxCheckResult struct {
 	Signature          string
-	Status             string      // "SUCCESS", "FAILED", "NOT_FOUND", "PENDING"
+	Status             string // "SUCCESS", "FAILED", "NOT_FOUND", "PENDING"
 	Message            string
 	Slot               uint64
 	Confirmations      uint64
@@ -404,6 +411,29 @@ func (c *RPCClient) GetTokenAccountsByOwner(ctx context.Context, owner, mint str
 		},
 	}
 
+	return c.parseTokenAccounts(ctx, req)
+}
+
+// GetAllTokenAccounts fetches ALL standard token accounts for an owner in a single RPC call
+// Optimization: This reduces N RPC calls (per position) to 1 call.
+func (c *RPCClient) GetAllTokenAccounts(ctx context.Context, owner string) ([]TokenAccountInfo, error) {
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "getTokenAccountsByOwner",
+		Params: []interface{}{
+			owner,
+			map[string]string{"programId": TokenProgramID},
+			map[string]string{
+				"encoding": "jsonParsed",
+			},
+		},
+	}
+
+	return c.parseTokenAccounts(ctx, req)
+}
+
+func (c *RPCClient) parseTokenAccounts(ctx context.Context, req RPCRequest) ([]TokenAccountInfo, error) {
 	var result struct {
 		Value []struct {
 			Pubkey  string `json:"pubkey"`

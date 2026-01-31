@@ -17,11 +17,11 @@ import (
 type CachedKeyManager struct {
 	keyPath      string
 	refreshEvery time.Duration
-	
-	mu         sync.RWMutex
-	privateKey []byte
-	publicKey  ed25519.PublicKey
-	address    string
+
+	mu          sync.RWMutex
+	privateKey  []byte
+	publicKey   ed25519.PublicKey
+	address     string
 	lastRefresh time.Time
 }
 
@@ -52,7 +52,7 @@ func (m *CachedKeyManager) GetOrGenerate() (*Wallet, error) {
 			Str("address", m.address).
 			Time("generatedAt", m.lastRefresh).
 			Msg("loaded wallet from cache")
-		
+
 		return m.createWallet()
 	}
 
@@ -69,7 +69,7 @@ func (m *CachedKeyManager) GetOrGenerate() (*Wallet, error) {
 	log.Info().
 		Str("address", m.address).
 		Msg("generated new wallet (cached for 10 minutes)")
-	
+
 	return m.createWallet()
 }
 
@@ -103,7 +103,7 @@ func (m *CachedKeyManager) Refresh() error {
 	log.Info().
 		Str("address", m.address).
 		Msg("wallet key refreshed")
-	
+
 	return nil
 }
 
